@@ -1,0 +1,18 @@
+/Users/gasu/Library/Android/sdk/cmake/3.22.1/bin/cmake \
+  -H/Users/gasu/AndroidStudioProjects/SwimmingAnalysisApplication/opencv/libcxx_helper \
+  -DCMAKE_SYSTEM_NAME=Android \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DCMAKE_SYSTEM_VERSION=21 \
+  -DANDROID_PLATFORM=android-21 \
+  -DANDROID_ABI=x86 \
+  -DCMAKE_ANDROID_ARCH_ABI=x86 \
+  -DANDROID_NDK=/Users/gasu/Library/Android/sdk/ndk/27.0.12077973 \
+  -DCMAKE_ANDROID_NDK=/Users/gasu/Library/Android/sdk/ndk/27.0.12077973 \
+  -DCMAKE_TOOLCHAIN_FILE=/Users/gasu/Library/Android/sdk/ndk/27.0.12077973/build/cmake/android.toolchain.cmake \
+  -DCMAKE_MAKE_PROGRAM=/Users/gasu/Library/Android/sdk/cmake/3.22.1/bin/ninja \
+  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/Users/gasu/AndroidStudioProjects/SwimmingAnalysisApplication/opencv/build/intermediates/cxx/Debug/543s4n3f/obj/x86 \
+  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/Users/gasu/AndroidStudioProjects/SwimmingAnalysisApplication/opencv/build/intermediates/cxx/Debug/543s4n3f/obj/x86 \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -B/Users/gasu/AndroidStudioProjects/SwimmingAnalysisApplication/opencv/.cxx/Debug/543s4n3f/x86 \
+  -GNinja \
+  -DANDROID_STL=c++_shared

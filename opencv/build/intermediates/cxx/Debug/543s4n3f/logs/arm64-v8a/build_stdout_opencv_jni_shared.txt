@@ -1,0 +1,2 @@
+ninja: Entering directory `/Users/gasu/AndroidStudioProjects/SwimmingAnalysisApplication/opencv/.cxx/Debug/543s4n3f/arm64-v8a'
+ninja: no work to do.
