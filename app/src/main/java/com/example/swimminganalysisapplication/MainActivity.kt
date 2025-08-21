@@ -2,7 +2,7 @@ package com.example.swimminganalysisapplication
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
+// import android.content.Context // VideoScreenで使用、LoginScreenでは未使用
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -17,28 +17,29 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue // 明示的なimportを追加
-import androidx.compose.runtime.setValue // 明示的なimportを追加
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+// import androidx.compose.runtime.getValue // 明示的なimportを追加 (既にある)
+// import androidx.compose.runtime.setValue // 明示的なimportを追加 (既にある)
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.swimminganalysisapplication.data.remote.RetrofitClient // 追加
+import com.example.swimminganalysisapplication.data.remote.model.HTTPValidationError // 追加
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-// import java.io.File // createVideoFileUri を使わないためコメントアウト
-// import java.text.SimpleDateFormat // createVideoFileUri を使わないためコメントアウト
-// import java.util.* // createVideoFileUri を使わないためコメントアウト
+import com.google.gson.Gson // 追加
+import kotlinx.coroutines.launch // 追加
 
-private const val TAG = "MainActivity"
+private const val TAG = "MainActivity" // VideoScreen用に残す
+private const val LOGIN_TAG = "LoginScreen" // LoginScreen用に新しいTAGを追加
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,25 +47,151 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SwimmingAnalysisApplicationTheme {
+                // ログイン状態を管理するState
+                var isLoggedIn by remember { mutableStateOf(false) } // 初期状態は未ログイン
+
+                // ログイン成功時に呼び出されるコールバック
+                val onLoginSuccess: (String) -> Unit = { token ->
+                    Log.i(LOGIN_TAG, "Login successful, token received.")
+                    // ここでトークンを保存する処理 (例: SharedPreferences, DataStore)
+                    // (今回はシンプルにするため、保存処理は省略し、ログイン状態のみ変更)
+                    isLoggedIn = true
+                }
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    VideoScreen()
+                    if (isLoggedIn) {
+                        VideoScreen()
+                    } else {
+                        LoginScreen(onLoginSuccess = onLoginSuccess)
+                    }
                 }
             }
         }
     }
 }
 
-// fun Context.createVideoFileUri(): Uri { ... } // この関数は使用しないためコメントアウトまたは削除
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(onLoginSuccess: (String) -> Unit) { // ログイン成功コールバックを受け取る
+    var username by remember { mutableStateOf("user@example.com") } // テスト用ユーザー名
+    var password by remember { mutableStateOf("aaa") } // テスト用パスワード
+    var loginResult by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
 
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Login", style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Username") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+            // visualTransformation = PasswordVisualTransformation() // 必要なら追加
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                isLoading = true
+                loginResult = null
+                coroutineScope.launch {
+                    try {
+                        Log.d(LOGIN_TAG, "Attempting login with U: $username") // パスワードはログに出力しないのが一般的
+                        val apiService = RetrofitClient.instance
+                        val response = apiService.login(
+                            username = username,
+                            password = password
+                        )
+
+                        if (response.isSuccessful) {
+                            val token = response.body()
+                            if (token != null && token.isNotBlank()) { // トークンがnullでなく、空文字列でもないことを確認
+                                loginResult = "Success!" // Token内容はログで確認するのでUIにはシンプルに
+                                Log.i(LOGIN_TAG, "Token: $token")
+                                onLoginSuccess(token) // 成功コールバックを呼び出し
+                            } else {
+                                loginResult = "Login Error: Token is null or empty. Code: ${response.code()}"
+                                Log.e(LOGIN_TAG, "Token is null or empty from response body. Code: ${response.code()}")
+                            }
+                        } else {
+                            val errorBodyString = response.errorBody()?.string()
+                            var errorMsg = "Login Error: ${response.code()}"
+                            if (!errorBodyString.isNullOrEmpty()) {
+                                errorMsg += "\nBody: (See Logcat)" // UIには詳細を出さない
+                                Log.e(LOGIN_TAG, "Code: ${response.code()}, Body: $errorBodyString")
+                                if (response.code() == 422) {
+                                    try {
+                                        val validationError = Gson().fromJson(errorBodyString, HTTPValidationError::class.java)
+                                        val specificErrors = validationError?.detail?.joinToString { vd -> vd.msg ?: "Unknown error" } ?: "No details"
+                                        errorMsg += "\nValidation: $specificErrors" // UIに少し詳細を出す場合
+                                        Log.e(LOGIN_TAG, "Parsed 422 Error: $specificErrors")
+                                    } catch (e: Exception) {
+                                        Log.e(LOGIN_TAG, "Failed to parse 422 error body: $e")
+                                    }
+                                }
+                            } else {
+                                Log.e(LOGIN_TAG, "Code: ${response.code()}, Error body is null or empty")
+                            }
+                            loginResult = errorMsg
+                        }
+                    } catch (e: Exception) {
+                        loginResult = "Login Exception: ${e.localizedMessage ?: "Unknown error"}"
+                        Log.e(LOGIN_TAG, "Exception during login", e)
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+            } else {
+                Text("Login")
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        loginResult?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+
+// VideoScreen() の続きと末尾
 @Composable
 fun VideoScreen() {
     val context = LocalContext.current
     var videoUri by remember { mutableStateOf<Uri?>(null) }
-    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) } // mutableStateOF を mutableStateOf に修正済
-    // var tempVideoFileUri by remember { mutableStateOf<Uri?>(null) } // 使用しないためコメントアウト
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
     val requestCameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -87,7 +214,7 @@ fun VideoScreen() {
     }
 
     val takeVideoLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult() // StartActivityForResult に変更済
+        ActivityResultContracts.StartActivityForResult()
     ) { result: ActivityResult ->
         Log.d(TAG, "takeVideoLauncher (StartActivityForResult) callback: resultCode = ${result.resultCode}, data = ${result.data}")
         if (result.resultCode == Activity.RESULT_OK) {
@@ -131,7 +258,6 @@ fun VideoScreen() {
             exoPlayer = newPlayer
             Log.i(TAG, "ExoPlayer initialized and assigned.")
 
-            // ★★★ Service の起動を追加 ★★★
             Log.d(TAG, "Attempting to start VideoProcessingService with URI: $videoUri")
             VideoProcessingService.startService(context, videoUri!!) // videoUriがnullでないことを確認済み
 
@@ -147,7 +273,7 @@ fun VideoScreen() {
         onDispose {
             Log.d(TAG, "VideoScreen DisposableEffect: Releasing ExoPlayer.")
             exoPlayer?.release()
-            exoPlayer = null
+            exoPlayer = null // ここで exoPlayer を null に設定
         }
     }
 
@@ -189,10 +315,9 @@ fun VideoScreen() {
                 Log.d(TAG, "Take Video button clicked.")
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                     Log.d(TAG, "Camera permission granted. Launching camera intent.")
-                    val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE) // Intent のみ作成
-                    // EXTRA_OUTPUT (tempVideoFileUri) は指定しない
+                    val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
                     if (intent.resolveActivity(context.packageManager) != null) {
-                        takeVideoLauncher.launch(intent) // Intent を渡して起動
+                        takeVideoLauncher.launch(intent)
                     } else {
                         Log.e(TAG, "No activity found to handle video capture intent.")
                     }
