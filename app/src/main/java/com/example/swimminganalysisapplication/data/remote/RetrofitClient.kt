@@ -8,7 +8,8 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    private const val BASE_URL = "https://sra-app-dev-c8e37e4463c6.herokuapp.com/"
+    // private const val BASE_URL = "https://swimming-race-analysis-db-e037cf1a2449.herokuapp.com/" // Heroku (Production)
+    private const val BASE_URL = "http://10.0.2.2:8000/" // Local FastAPI for Emulator (Development)
 
     // OkHttpクライアントの設定 (ログ出力インターセプターを含む)
     private val okHttpClient: OkHttpClient by lazy {
@@ -26,7 +27,7 @@ object RetrofitClient {
     // Retrofitインスタンスの生成
     val instance: ApiService by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(BASE_URL) // 現在は開発用URLが使用される
             .client(okHttpClient) // カスタムOkHttpクライアントを設定
             .addConverterFactory(GsonConverterFactory.create()) // JSONコンバータ (Gson)
             // .addConverterFactory(ScalarsConverterFactory.create()) // もしレスポンスが本当にプレーンな文字列の場合、こちらが必要になることも
