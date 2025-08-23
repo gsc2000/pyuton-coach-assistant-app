@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import android.util.Log // Log import
+import com.example.swimminganalysisapplication.data.remote.model.SwimmerRequest
 
 // UIの状態を表すデータクラス
 data class SwimmersUiState(
@@ -59,12 +60,13 @@ class SwimmersViewModel(private val repository: SwimmingRepository) : ViewModel(
             _uiState.value = _uiState.value.copy(errorMessage = "選手名は必須です。")
             return
         }
-        val newSwimmer = Swimmer(id = 0, name = name, age = age, team = team)
-        Log.d("SwimmersViewModel", "createSwimmer called with: $newSwimmer")
+        val swimmerRequest = SwimmerRequest(name = name, age = age, team = team)
+
+        Log.d("SwimmersViewModel", "createSwimmer called with: $swimmerRequest")
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
         viewModelScope.launch {
             try {
-                val createdSwimmer = repository.createSwimmer(newSwimmer)
+                val createdSwimmer = repository.createSwimmer(swimmerRequest)
                 if (createdSwimmer != null) {
                     Log.i("SwimmersViewModel", "Swimmer created successfully: $createdSwimmer")
                     loadSwimmers() 

@@ -5,16 +5,16 @@ import com.example.swimminganalysisapplication.data.remote.ApiService
 import com.example.swimminganalysisapplication.data.remote.model.Race
 import com.example.swimminganalysisapplication.data.remote.model.Result
 import com.example.swimminganalysisapplication.data.remote.model.Swimmer
+import com.example.swimminganalysisapplication.data.remote.model.SwimmerRequest
 
-// ApiServiceをコンストラクタで受け取ることで、テスト時にモックを注入しやすくなります。
 class SwimmingRepository(private val apiService: ApiService) {
 
-    private fun <T> handleResponse(response: retrofit2.Response<T>, successMessage: String, entityName: String, operation: String, entityId: String? = null): T? {
+    private fun <T> handleResponse(response: retrofit2.Response<T>, successMessage: String, entityName: String, operation: String, entityId: Int? = null): T? {
         if (response.isSuccessful) {
-            Log.i("SwimmingRepository", "$successMessage - $entityName ${entityId ?: ""} $operation successful.")
+            Log.i("SwimmingRepository", "$successMessage - $entityName ${entityId?.toString() ?: ""} $operation successful.")
             return response.body()
         } else {
-            val errorMsg = "Failed to $operation $entityName ${entityId ?: ""}: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
+            val errorMsg = "Failed to $operation $entityName ${entityId?.toString() ?: ""}: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
             Log.e("SwimmingRepository", errorMsg)
             throw ApiException("$operation $entityName に失敗しました: ${response.code()}")
         }
@@ -42,22 +42,22 @@ class SwimmingRepository(private val apiService: ApiService) {
         }
     }
 
-
     // --- Swimmer ---
     suspend fun getAllSwimmers(): List<Swimmer> {
         return handleListResponse(apiService.getAllSwimmers(), "swimmers")
     }
 
     suspend fun getSwimmer(id: Int): Swimmer? {
-        return handleResponse(apiService.getSwimmer(id), "Fetched swimmer", "Swimmer", "get", id.toString())
+        return handleResponse(apiService.getSwimmer(id), "Fetched swimmer", "Swimmer", "get", id)
     }
 
-    suspend fun createSwimmer(swimmer: Swimmer): Swimmer? {
+    suspend fun createSwimmer(swimmer: SwimmerRequest): Swimmer? {
         return handleResponse(apiService.createSwimmer(swimmer), "Created swimmer", "Swimmer", "create")
     }
 
     suspend fun updateSwimmer(id: Int, swimmer: Swimmer): Swimmer? {
-        return handleResponse(apiService.updateSwimmer(id, swimmer), "Updated swimmer", "Swimmer", "update", id.toString())
+        val swimmerRequest = SwimmerRequest(name = swimmer.name, age = swimmer.age, team = swimmer.team)
+        return handleResponse(apiService.updateSwimmer(id, swimmerRequest), "Updated swimmer", "Swimmer", "update", id)
     }
 
     suspend fun deleteSwimmer(id: Int): Boolean {
@@ -70,7 +70,7 @@ class SwimmingRepository(private val apiService: ApiService) {
     }
 
     suspend fun getRace(id: Int): Race? {
-        return handleResponse(apiService.getRace(id), "Fetched race", "Race", "get", id.toString())
+        return handleResponse(apiService.getRace(id), "Fetched race", "Race", "get", id)
     }
 
     suspend fun createRace(race: Race): Race? {
@@ -78,7 +78,8 @@ class SwimmingRepository(private val apiService: ApiService) {
     }
 
     suspend fun updateRace(id: Int, race: Race): Race? {
-        return handleResponse(apiService.updateRace(id, race), "Updated race", "Race", "update", id.toString())
+        // Note: ApiService.updateRace expects Race. If it changes to RaceRequest, conversion will be needed here.
+        return handleResponse(apiService.updateRace(id, race), "Updated race", "Race", "update", id)
     }
 
     suspend fun deleteRace(id: Int): Boolean {
@@ -91,7 +92,7 @@ class SwimmingRepository(private val apiService: ApiService) {
     }
 
     suspend fun getResult(id: Int): Result? {
-        return handleResponse(apiService.getResult(id), "Fetched result", "Result", "get", id.toString())
+        return handleResponse(apiService.getResult(id), "Fetched result", "Result", "get", id)
     }
 
     suspend fun createResult(result: Result): Result? {
@@ -99,7 +100,8 @@ class SwimmingRepository(private val apiService: ApiService) {
     }
 
     suspend fun updateResult(id: Int, result: Result): Result? {
-        return handleResponse(apiService.updateResult(id, result), "Updated result", "Result", "update", id.toString())
+        // Note: ApiService.updateResult expects Result. If it changes to ResultRequest, conversion will be needed here.
+        return handleResponse(apiService.updateResult(id, result), "Updated result", "Result", "update", id)
     }
 
     suspend fun deleteResult(id: Int): Boolean {
@@ -107,5 +109,4 @@ class SwimmingRepository(private val apiService: ApiService) {
     }
 }
 
-// カスタム例外クラス（ファイルの下部や別ファイルに定義）
 class ApiException(message: String) : Exception(message)
