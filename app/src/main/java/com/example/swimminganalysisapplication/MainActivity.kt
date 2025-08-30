@@ -15,6 +15,7 @@ import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.RetrofitClient
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerScreen
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerViewModelFactory
+import com.example.swimminganalysisapplication.ui.home.HomeScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersViewModelFactory
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
@@ -40,8 +41,11 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = AppDestinations.VIDEO_SCREEN_ROUTE
+                        startDestination = AppDestinations.HOME_SCREEN_ROUTE
                     ) {
+                        composable(AppDestinations.HOME_SCREEN_ROUTE) { // Add HomeScreen route
+                            HomeScreen(navController = navController)
+                        }
                         composable(AppDestinations.VIDEO_SCREEN_ROUTE) {
                             VideoScreen(navController = navController)
                         }

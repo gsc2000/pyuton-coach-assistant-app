@@ -16,18 +16,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack // For Back Arrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SwapHoriz // For layout toggle
-import androidx.compose.material.icons.filled.SwapVert  // For layout toggle
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api // For TopAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold // For Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar // For TopAppBar
+import androidx.compose.material3.TopAppBarDefaults // For TopAppBar colors
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -45,14 +50,13 @@ import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
+import com.example.swimminganalysisapplication.navigation.AppDestinations // Ensure this is imported
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
-import com.example.swimminganalysisapplication.navigation.AppDestinations
 
 private const val TAG = "VideoScreen"
 
-// Helper function to format time from milliseconds to MM:SS
 private fun formatTime(millis: Long): String {
     if (millis == C.TIME_UNSET || millis < 0) return "00:00"
     val totalSeconds = millis / 1000
@@ -115,7 +119,6 @@ private fun VideoPlayerBox(
     }
 }
 
-// Helper function to launch camera (used by Dialog)
 private fun launchCameraAction(
     context: Context,
     videoIndex: Int,
@@ -140,7 +143,6 @@ private fun launchCameraAction(
     }
 }
 
-// Helper function to launch gallery (used by Dialog)
 private fun launchGalleryAction(
     context: Context,
     videoIndex: Int,
@@ -179,7 +181,7 @@ private fun VideoSourceChooserDialog(
     )
 }
 
-
+@OptIn(ExperimentalMaterial3Api::class) // For TopAppBar
 @Composable
 fun VideoScreen(navController: NavController) {
     val context = LocalContext.current
@@ -219,13 +221,11 @@ fun VideoScreen(navController: NavController) {
         else if (maxDuration == 0L) currentPosition = 0L
     }
 
-    // Action Launchers (to get video content)
     val takeVideoLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> if (result.resultCode == Activity.RESULT_OK) result.data?.data?.let { videoUri1 = it } }
     val selectVideoLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> videoUri1 = uri }
     val takeVideoLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> if (result.resultCode == Activity.RESULT_OK) result.data?.data?.let { videoUri2 = it } }
     val selectVideoLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> videoUri2 = uri }
 
-    // Permission Launchers (callbacks directly launch actions now)
     val requestCameraPermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
             val takeVideoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
@@ -249,8 +249,7 @@ fun VideoScreen(navController: NavController) {
         if (isGranted) { selectVideoLauncher2.launch("video/*") }
     }
 
-    // ExoPlayer Lifecycles
-    LaunchedEffect(videoUri1) { /* ... same as before ... */
+    LaunchedEffect(videoUri1) {
         exoPlayer1?.release(); exoPlayer1 = null
         individualCurrentPosition1 = 0L; individualDuration1 = 0L
         if (videoUri1 != null) {
@@ -272,7 +271,7 @@ fun VideoScreen(navController: NavController) {
             updateSharedMaxDuration()
         } else { videoAspectRatio1 = null; updateSharedMaxDuration(); if (exoPlayer2 == null) currentPosition = 0L }
     }
-    LaunchedEffect(videoUri2) { /* ... same as before ... */
+    LaunchedEffect(videoUri2) {
         exoPlayer2?.release(); exoPlayer2 = null
         individualCurrentPosition2 = 0L; individualDuration2 = 0L
         if (videoUri2 != null) {
@@ -295,8 +294,7 @@ fun VideoScreen(navController: NavController) {
         } else { videoAspectRatio2 = null; updateSharedMaxDuration(); if (exoPlayer1 == null) currentPosition = 0L }
     }
 
-    // Playback Control Effect
-    LaunchedEffect(isPlaying, exoPlayer1, exoPlayer2) { /* ... same as before ... */
+    LaunchedEffect(isPlaying, exoPlayer1, exoPlayer2) {
         if (isPlaying) {
             exoPlayer1?.let { player -> val dur = individualDuration1.takeIf{it>0L} ?: player.duration; val target = min(currentPosition, dur); if(player.playbackState == Player.STATE_IDLE) player.prepare(); player.seekTo(target); if (target < dur || (dur==0L && target==0L)) player.play() else player.pause() }
             exoPlayer2?.let { player -> val dur = individualDuration2.takeIf{it>0L} ?: player.duration; val target = min(currentPosition, dur); if(player.playbackState == Player.STATE_IDLE) player.prepare(); player.seekTo(target); if (target < dur || (dur==0L && target==0L)) player.play() else player.pause() }
@@ -305,8 +303,7 @@ fun VideoScreen(navController: NavController) {
         }
     }
 
-    // Periodic Update Effect (Polling)
-    LaunchedEffect(Unit) { /* ... same as before ... */
+    LaunchedEffect(Unit) {
         while (true) {
             if (isPlaying && !isSeeking) {
                 val activePlayer = run {
@@ -324,64 +321,89 @@ fun VideoScreen(navController: NavController) {
 
     DisposableEffect(Unit) { onDispose { exoPlayer1?.release(); exoPlayer1 = null; exoPlayer2?.release(); exoPlayer2 = null } }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(Modifier.weight(1f))
-
-        Box(modifier = Modifier.weight(3f).fillMaxWidth()) {
-            if (isHorizontalLayout) {
-                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VideoPlayerBox(exoPlayer1, videoAspectRatio1, "Video 1", individualCurrentPosition1, individualDuration1, onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxHeight())
-                    VideoPlayerBox(exoPlayer2, videoAspectRatio2, "Video 2", individualCurrentPosition2, individualDuration2, onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxHeight())
-                }
-            } else {
-                Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VideoPlayerBox(exoPlayer1, videoAspectRatio1, "Video 1", individualCurrentPosition1, individualDuration1, onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxWidth())
-                    VideoPlayerBox(exoPlayer2, videoAspectRatio2, "Video 2", individualCurrentPosition2, individualDuration2, onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxWidth())
-                }
-            }
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-        ) {
-            IconButton(onClick = { isPlaying = !isPlaying }, modifier = Modifier.size(64.dp)) {
-                Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) "Pause" else "Play", modifier = Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = { isHorizontalLayout = !isHorizontalLayout }, modifier = Modifier.size(56.dp)) {
-                Icon(if (isHorizontalLayout) Icons.Filled.SwapVert else Icons.Filled.SwapHoriz, if (isHorizontalLayout) "Vertical" else "Horizontal", modifier = Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(formatTime(currentPosition), style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.width(8.dp))
-            Slider(
-                value = if (maxDuration > 0) currentPosition.toFloat() / maxDuration.toFloat() else 0f,
-                onValueChange = { newValue -> isSeeking = true; currentPosition = (newValue * maxDuration).toLong() },
-                onValueChangeFinished = {
-                    exoPlayer1?.seekTo(min(currentPosition, individualDuration1.takeIf { it > 0 } ?: currentPosition))
-                    exoPlayer2?.seekTo(min(currentPosition, individualDuration2.takeIf { it > 0 } ?: currentPosition))
-                    isSeeking = false
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("動画解析") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "ホームに戻る"
+                        )
+                    }
                 },
-                modifier = Modifier.weight(1f)
+                colors = TopAppBarDefaults.topAppBarColors( // Optional: to style the TopAppBar
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
-            Spacer(Modifier.width(8.dp))
-            Text(formatTime(maxDuration), style = MaterialTheme.typography.bodySmall)
         }
-        if (isSeeking || (isPlaying && (exoPlayer1?.isLoading == true || exoPlayer2?.isLoading == true))) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
-        }
-
-        Button(
-            onClick = { navController.navigate(AppDestinations.SWIMMERS_SCREEN_ROUTE) }, // こちらに修正
-            modifier = Modifier.padding(top = 24.dp).fillMaxWidth()
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues) // Apply padding from Scaffold
+                .padding(16.dp),       // Your original screen padding
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("選手一覧へ")
+            Spacer(Modifier.weight(1f)) // Pushes content below
+
+            Box(modifier = Modifier.weight(3f).fillMaxWidth()) { // Video players area
+                if (isHorizontalLayout) {
+                    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VideoPlayerBox(exoPlayer1, videoAspectRatio1, "Video 1", individualCurrentPosition1, individualDuration1, onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        VideoPlayerBox(exoPlayer2, videoAspectRatio2, "Video 2", individualCurrentPosition2, individualDuration2, onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    }
+                } else { // Vertical layout
+                    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        VideoPlayerBox(exoPlayer1, videoAspectRatio1, "Video 1", individualCurrentPosition1, individualDuration1, onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxWidth())
+                        VideoPlayerBox(exoPlayer2, videoAspectRatio2, "Video 2", individualCurrentPosition2, individualDuration2, onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
+            }
+
+            // Shared Playback Controls & Layout Toggle
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                IconButton(onClick = { isPlaying = !isPlaying }, modifier = Modifier.size(64.dp)) {
+                    Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) "Pause" else "Play", modifier = Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = { isHorizontalLayout = !isHorizontalLayout }, modifier = Modifier.size(56.dp)) {
+                    Icon(if (isHorizontalLayout) Icons.Filled.SwapVert else Icons.Filled.SwapHoriz, if (isHorizontalLayout) "Vertical" else "Horizontal", modifier = Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            // Shared Progress Bar
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(formatTime(currentPosition), style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.width(8.dp))
+                Slider(
+                    value = if (maxDuration > 0) currentPosition.toFloat() / maxDuration.toFloat() else 0f,
+                    onValueChange = { newValue -> isSeeking = true; currentPosition = (newValue * maxDuration).toLong() },
+                    onValueChangeFinished = {
+                        exoPlayer1?.seekTo(min(currentPosition, individualDuration1.takeIf { it > 0 } ?: currentPosition))
+                        exoPlayer2?.seekTo(min(currentPosition, individualDuration2.takeIf { it > 0 } ?: currentPosition))
+                        isSeeking = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(formatTime(maxDuration), style = MaterialTheme.typography.bodySmall)
+            }
+            if (isSeeking || (isPlaying && (exoPlayer1?.isLoading == true || exoPlayer2?.isLoading == true))) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+            }
+
+            // "選手一覧へ" Button is removed.
+            // If you need other buttons here later, they can be added.
+            // For now, this section is empty.
+            Spacer(modifier = Modifier.height(24.dp)) // Add some space at the bottom if needed or remove if not.
+
         }
     }
 
@@ -398,4 +420,3 @@ fun VideoScreen(navController: NavController) {
         )
     }
 }
-
