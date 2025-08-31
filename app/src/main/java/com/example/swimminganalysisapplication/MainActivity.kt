@@ -21,7 +21,7 @@ import com.example.swimminganalysisapplication.ui.swimmers.SwimmersViewModelFact
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
 import com.example.swimminganalysisapplication.ui.video.VideoScreen
 import com.example.swimminganalysisapplication.navigation.AppDestinations
-
+import com.example.swimminganalysisapplication.ui.video.StartPositionSettingScreen
 class MainActivity : ComponentActivity() {
 
     private val swimmingRepository by lazy { SwimmingRepository(RetrofitClient.instance) }
@@ -59,6 +59,28 @@ class MainActivity : ComponentActivity() {
                             AddSwimmerScreen(
                                 navController = navController,
                                 factory = addSwimmerViewModelFactory
+                            )
+                        }
+                        composable(
+                            route = AppDestinations.START_POSITION_SETTING_ROUTE +
+                                    "?video1Uri={video1Uri}&video2Uri={video2Uri}" +
+                                    "&currentStart1Ms={currentStart1Ms}&currentStart2Ms={currentStart2Ms}" +
+                                    "&duration1Ms={duration1Ms}&duration2Ms={duration2Ms}",
+                            // Arguments definition can be more explicit if needed, but string query params work
+                        ) { backStackEntry ->
+                            val video1UriString = backStackEntry.arguments?.getString("video1Uri")
+                            val video2UriString = backStackEntry.arguments?.getString("video2Uri")
+                            val currentStart1Ms = backStackEntry.arguments?.getString("currentStart1Ms")?.toLongOrNull() ?: 0L
+                            val currentStart2Ms = backStackEntry.arguments?.getString("currentStart2Ms")?.toLongOrNull() ?: 0L
+                            val duration1Ms = backStackEntry.arguments?.getString("duration1Ms")?.toLongOrNull() ?: 0L
+                            val duration2Ms = backStackEntry.arguments?.getString("duration2Ms")?.toLongOrNull() ?: 0L
+
+                            StartPositionSettingScreen(
+                                navController = navController,
+                                video1UriString = video1UriString,
+                                video2UriString = video2UriString,
+                                initialStart1Ms = currentStart1Ms, initialStart2Ms = currentStart2Ms,
+                                duration1Ms = duration1Ms, duration2Ms = duration2Ms
                             )
                         }
                     }
