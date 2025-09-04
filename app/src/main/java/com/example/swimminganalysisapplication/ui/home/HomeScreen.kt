@@ -1,12 +1,6 @@
 package com.example.swimminganalysisapplication.ui.home
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,26 +21,40 @@ fun HomeScreen(navController: NavController) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "スイミング分析アプリ",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 48.dp)
+            text = "スイムアナリシス",
+            style = MaterialTheme.typography.headlineLarge,
+            modifier = Modifier.padding(bottom = 32.dp)
         )
 
         Button(
             onClick = { navController.navigate(AppDestinations.VIDEO_SCREEN_ROUTE) },
-            modifier = Modifier.widthIn(min = 200.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
         ) {
-            Text("動画解析")
+            Text("動画解析を開始")
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = { navController.navigate(AppDestinations.SWIMMERS_SCREEN_ROUTE) },
-            modifier = Modifier.widthIn(min = 200.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
         ) {
             Text("選手一覧")
         }
+
+        // New Button to navigate to CreatePracticeMenuScreen
+        Button(
+            onClick = { navController.navigate(AppDestinations.CREATE_PRACTICE_MENU_ROUTE) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Text("練習メニューを作成")
+        }
+
+        // You can add more buttons here for other features
+
     }
 }
-

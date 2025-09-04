@@ -16,6 +16,7 @@ import com.example.swimminganalysisapplication.data.remote.RetrofitClient
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerScreen
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerViewModelFactory
 import com.example.swimminganalysisapplication.ui.home.HomeScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuScreen // New Import
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersViewModelFactory
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
@@ -82,6 +83,9 @@ class MainActivity : ComponentActivity() {
                                 initialStart1Ms = currentStart1Ms, initialStart2Ms = currentStart2Ms,
                                 duration1Ms = duration1Ms, duration2Ms = duration2Ms
                             )
+                        }
+                        composable(AppDestinations.CREATE_PRACTICE_MENU_ROUTE) {
+                            CreatePracticeMenuScreen(navController = navController)
                         }
                     }
                 }
