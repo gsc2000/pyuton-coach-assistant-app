@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen // SplashScreenのインポート
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,17 +16,18 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.RetrofitClient
+import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerScreen
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerViewModelFactory
 import com.example.swimminganalysisapplication.ui.home.HomeScreen
-import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen // Corrected import
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersViewModelFactory
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
-import com.example.swimminganalysisapplication.ui.video.VideoScreen
-import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.video.StartPositionSettingScreen
+import com.example.swimminganalysisapplication.ui.video.VideoScreen
+
 class MainActivity : ComponentActivity() {
 
     private val swimmingRepository by lazy { SwimmingRepository(RetrofitClient.instance) }
@@ -33,6 +35,9 @@ class MainActivity : ComponentActivity() {
     private val addSwimmerViewModelFactory by lazy { AddSwimmerViewModelFactory(swimmingRepository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Handle the splash screen transition.
+        installSplashScreen() // スプラッシュスクリーンのインストール
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
@@ -93,14 +98,13 @@ class MainActivity : ComponentActivity() {
                                 duration2Ms = duration2MsArg
                             )
                         }
-                        // CreatePracticeMenuScreen のルート定義を更新
                         composable(
                             route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE,
                             arguments = listOf(
                                 navArgument("menuId") {
                                     type = NavType.StringType
-                                    nullable = true // menuId はオプション
-                                    defaultValue = null // デフォルトはnull（新規作成時）
+                                    nullable = true
+                                    defaultValue = null
                                 }
                             )
                         ) { backStackEntry ->
@@ -116,4 +120,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

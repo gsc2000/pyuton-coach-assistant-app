@@ -78,7 +78,7 @@ fun HomeScreen(navController: NavController) {
             )
 
             Text(
-                text = "AIが導き、つながりが広げる\\nコーチングの未来", // Updated catchphrase with newline
+                text = "AIが導き、つながりが広げる\nコーチングの未来", // Updated catchphrase with newline
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

@@ -52,6 +52,7 @@ android {
 
 dependencies {
 
+    implementation("androidx.core:core-splashscreen:1.0.1") // 最新バージョンを確認してください
     implementation(project(mapOf("path" to ":opencv")))
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
