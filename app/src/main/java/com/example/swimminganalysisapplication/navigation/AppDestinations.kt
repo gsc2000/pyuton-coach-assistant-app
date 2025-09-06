@@ -6,5 +6,8 @@ object AppDestinations {
     const val SWIMMERS_SCREEN_ROUTE = "swimmers_screen"
     const val ADD_SWIMMER_ROUTE = "add_swimmer_screen"
     const val START_POSITION_SETTING_ROUTE = "start_position_setting_screen"
-    const val CREATE_PRACTICE_MENU_ROUTE = "create_practice_menu_screen" // New Route
+    const val CREATE_PRACTICE_MENU_ROUTE = "create_practice_menu_screen"
+    const val VIDEO_TRIM_SETUP_ROUTE = "video_trim_setup_screen"
+    const val PRACTICE_LIST_SCREEN_ROUTE = "practice_list_screen" // New route for practice list
 }
+

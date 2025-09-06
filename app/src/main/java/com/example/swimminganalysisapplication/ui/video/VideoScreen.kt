@@ -15,6 +15,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
@@ -24,6 +27,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +62,7 @@ import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch // Import launch
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import kotlin.math.abs
@@ -69,7 +74,7 @@ private const val SEEK_COMMAND_THRESHOLD_MS = 200 // Threshold to avoid tiny see
 
 // Saver for Uri type for rememberSaveable
 val UriSaver: Saver<Uri?, String> = Saver(
-    save = { uri: Uri? -> uri?.toString() ?: "" }, // scope は不要でした
+    save = { uri: Uri? -> uri?.toString() ?: "" },
     restore = { value: String -> if (value.isNotEmpty()) Uri.parse(value) else null }
 )
 
@@ -125,7 +130,9 @@ private fun VideoPlayerBox(
                 }
             } else {
                 Box(
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("$videoName: タップして読込", style = MaterialTheme.typography.bodyMedium)
@@ -175,19 +182,19 @@ private fun VideoSourceChooserDialog(onDismissRequest: () -> Unit, onTakeVideoCl
 @Composable
 fun VideoScreen(navController: NavController) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope() // Get a CoroutineScope
 
-    // Use rememberSaveable for URIs to persist them across configuration changes and process death.
     var videoUri1 by rememberSaveable(stateSaver = UriSaver) { mutableStateOf<Uri?>(null) }
     var exoPlayer1 by remember { mutableStateOf<ExoPlayer?>(null) }
     var videoAspectRatio1 by remember { mutableStateOf<Float?>(null) }
     var originalDuration1Ms by remember { mutableStateOf(0L) }
-    var startPosition1Ms by rememberSaveable { mutableStateOf(0L) } // Also make start positions saveable
+    var startPosition1Ms by rememberSaveable { mutableStateOf(0L) }
 
     var videoUri2 by rememberSaveable(stateSaver = UriSaver) { mutableStateOf<Uri?>(null) }
     var exoPlayer2 by remember { mutableStateOf<ExoPlayer?>(null) }
     var videoAspectRatio2 by remember { mutableStateOf<Float?>(null) }
     var originalDuration2Ms by remember { mutableStateOf(0L) }
-    var startPosition2Ms by rememberSaveable { mutableStateOf(0L) } // Also make start positions saveable
+    var startPosition2Ms by rememberSaveable { mutableStateOf(0L) }
 
 
     var isPlaying by rememberSaveable { mutableStateOf(false) }
@@ -195,7 +202,7 @@ fun VideoScreen(navController: NavController) {
 
     var sharedCurrentPositionMs by rememberSaveable { mutableStateOf(0L) }
     var sharedMaxDurationMs by rememberSaveable { mutableStateOf(0L) }
-    var isSeeking by remember { mutableStateOf(false) }
+    var isSeeking by remember { mutableStateOf(false) } // Used to prevent position updates during seek
 
     var showVideoSourceDialog by remember { mutableStateOf(false) }
     var videoPlayerTargetForDialog by remember { mutableStateOf(0) }
@@ -219,8 +226,8 @@ fun VideoScreen(navController: NavController) {
                     currentBackStackEntry.savedStateHandle.remove<Long>("newStart1Ms")
                     currentBackStackEntry.savedStateHandle.remove<Long>("newStart2Ms")
 
-                    sharedCurrentPositionMs = 0L // Reset shared position
-                    isPlaying = false // Stop playback to apply new start times
+                    sharedCurrentPositionMs = 0L
+                    isPlaying = false
                 }
             }
         }
@@ -243,7 +250,7 @@ fun VideoScreen(navController: NavController) {
         if (sharedMaxDurationMs != newMax) {
             Log.d(TAG, "updateSharedMaxDuration: OldMax=$sharedMaxDurationMs, NewMax=$newMax. currentSharedPos=$sharedCurrentPositionMs")
             sharedMaxDurationMs = newMax
-            sharedCurrentPositionMs = sharedCurrentPositionMs.coerceIn(0L, newMax) // Ensure current is within new bounds
+            sharedCurrentPositionMs = sharedCurrentPositionMs.coerceIn(0L, newMax) // Ensure current position is within new max
         }
     }
     LaunchedEffect(startPosition1Ms, startPosition2Ms, originalDuration1Ms, originalDuration2Ms, exoPlayer1, exoPlayer2) {
@@ -288,149 +295,344 @@ fun VideoScreen(navController: NavController) {
         }
     }
 
-    val requestCameraPermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> if (ok) { val i = Intent(MediaStore.ACTION_VIDEO_CAPTURE); if (i.resolveActivity(context.packageManager)!=null) takeVideoLauncher1.launch(i) } }
-    val requestStoragePermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> if (ok) selectVideoLauncher1.launch("video/*") }
-    val requestCameraPermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> if (ok) { val i = Intent(MediaStore.ACTION_VIDEO_CAPTURE); if (i.resolveActivity(context.packageManager)!=null) takeVideoLauncher2.launch(i) } }
-    val requestStoragePermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> if (ok) selectVideoLauncher2.launch("video/*") }
+    lateinit var requestCameraPermissionLauncher1: ActivityResultLauncher<String>
+    lateinit var requestStoragePermissionLauncher1: ActivityResultLauncher<String>
+    lateinit var requestCameraPermissionLauncher2: ActivityResultLauncher<String>
+    lateinit var requestStoragePermissionLauncher2: ActivityResultLauncher<String>
 
-
-    LaunchedEffect(videoUri1) {
-        Log.d(TAG, "PlayerInit1: videoUri1 changed to $videoUri1. Current exoPlayer1: ${exoPlayer1 != null}")
-        exoPlayer1?.release(); exoPlayer1 = null; originalDuration1Ms = 0L
-        videoUri1?.let { uri ->
-            Log.d(TAG, "PlayerInit1: Initializing ExoPlayer for $uri")
-            exoPlayer1 = ExoPlayer.Builder(context).build().apply {
-                setMediaItem(MediaItem.fromUri(uri))
-                addListener(object : Player.Listener {
-                    override fun onVideoSizeChanged(vs: VideoSize) { if (vs.width > 0 && vs.height > 0) videoAspectRatio1 = vs.width.toFloat() / vs.height.toFloat() }
-                    override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_READY) { originalDuration1Ms = this@apply.duration.takeIf {it!=C.TIME_UNSET && it>0}?:0L; Log.d(TAG, "PlayerInit1: STATE_READY, duration=$originalDuration1Ms"); updateSharedMaxDuration() } }
-                    override fun onTimelineChanged(tl: Timeline, reason: Int) { originalDuration1Ms = this@apply.duration.takeIf {it!=C.TIME_UNSET&&it>0}?:0L; Log.d(TAG, "PlayerInit1: TIMELINE_CHANGED, duration=$originalDuration1Ms"); updateSharedMaxDuration() }
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) { Log.e(TAG, "PlayerInit1: ExoPlayer Error: ", error) }
-                })
-                prepare(); playWhenReady = false
-            }
-        } ?: run { Log.d(TAG, "PlayerInit1: videoUri1 is null, player not created.") }
-        updateSharedMaxDuration()
+    requestCameraPermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) launchCameraAction(context, 1, takeVideoLauncher1, takeVideoLauncher2, requestCameraPermissionLauncher1, requestCameraPermissionLauncher2)
+        else Log.w(TAG, "Camera permission denied for video 1")
     }
-    LaunchedEffect(videoUri2) {
-        Log.d(TAG, "PlayerInit2: videoUri2 changed to $videoUri2. Current exoPlayer2: ${exoPlayer2 != null}")
-        exoPlayer2?.release(); exoPlayer2 = null; originalDuration2Ms = 0L
-        videoUri2?.let { uri ->
-            Log.d(TAG, "PlayerInit2: Initializing ExoPlayer for $uri")
-            exoPlayer2 = ExoPlayer.Builder(context).build().apply {
-                setMediaItem(MediaItem.fromUri(uri))
-                addListener(object : Player.Listener {
-                    override fun onVideoSizeChanged(vs: VideoSize) { if (vs.width > 0 && vs.height > 0) videoAspectRatio2 = vs.width.toFloat() / vs.height.toFloat() }
-                    override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_READY) { originalDuration2Ms = this@apply.duration.takeIf {it!=C.TIME_UNSET && it>0}?:0L; Log.d(TAG, "PlayerInit2: STATE_READY, duration=$originalDuration2Ms"); updateSharedMaxDuration() } }
-                    override fun onTimelineChanged(tl: Timeline, reason: Int) { originalDuration2Ms = this@apply.duration.takeIf {it!=C.TIME_UNSET&&it>0}?:0L; Log.d(TAG, "PlayerInit2: TIMELINE_CHANGED, duration=$originalDuration2Ms"); updateSharedMaxDuration() }
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) { Log.e(TAG, "PlayerInit2: ExoPlayer Error: ", error) }
-                })
-                prepare(); playWhenReady = false
-            }
-        } ?: run { Log.d(TAG, "PlayerInit2: videoUri2 is null, player not created.") }
-        updateSharedMaxDuration()
+    requestStoragePermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) launchGalleryAction(context, 1, selectVideoLauncher1, selectVideoLauncher2, requestStoragePermissionLauncher1, requestStoragePermissionLauncher2)
+        else Log.w(TAG, "Storage permission denied for video 1")
+    }
+    requestCameraPermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) launchCameraAction(context, 2, takeVideoLauncher1, takeVideoLauncher2, requestCameraPermissionLauncher1, requestCameraPermissionLauncher2)
+        else Log.w(TAG, "Camera permission denied for video 2")
+    }
+    requestStoragePermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) launchGalleryAction(context, 2, selectVideoLauncher1, selectVideoLauncher2, requestStoragePermissionLauncher1, requestStoragePermissionLauncher2)
+        else Log.w(TAG, "Storage permission denied for video 2")
     }
 
-    LaunchedEffect(isPlaying, sharedCurrentPositionMs, isSeeking, startPosition1Ms, startPosition2Ms) {
-        if (isSeeking) {
-            exoPlayer1?.pause(); exoPlayer2?.pause()
+    fun initializeOrUpdatePlayer(player: ExoPlayer?, uri: Uri?, startPosMs: Long,
+                                 setPlayer: (ExoPlayer?) -> Unit, setAspectRatio: (Float?) -> Unit,
+                                 setOriginalDuration: (Long) -> Unit) {
+        if (uri == null) {
+            player?.release()
+            setPlayer(null)
+            setAspectRatio(null)
+            setOriginalDuration(0L)
+            updateSharedMaxDuration()
+            return
+        }
+
+        val newPlayer = player ?: ExoPlayer.Builder(context).build().also {
+            it.addListener(object : Player.Listener {
+                override fun onVideoSizeChanged(videoSize: VideoSize) {
+                    val aspectRatio = if (videoSize.height == 0) 16f / 9f else videoSize.width.toFloat() / videoSize.height
+                    setAspectRatio(aspectRatio)
+                    Log.d(TAG, "Video size changed: ${videoSize.width}x${videoSize.height}, AspectRatio: $aspectRatio")
+                }
+
+                override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                    if (timeline.windowCount > 0) {
+                        val window = Timeline.Window()
+                        timeline.getWindow(0, window)
+                        val duration = window.durationMs
+                        if (duration != C.TIME_UNSET && duration > 0) {
+                            setOriginalDuration(duration)
+                            Log.d(TAG, "Timeline changed. Original duration: $duration ms for player of $uri")
+                            updateSharedMaxDuration()
+                        }
+                    }
+                }
+
+                override fun onIsPlayingChanged(isPlayingChange: Boolean) {
+                    Log.d(TAG, "ExoPlayer (uri: $uri) onIsPlayingChanged: $isPlayingChange. Current composable isPlaying: $isPlaying")
+                }
+            })
+        }
+        setPlayer(newPlayer)
+        val mediaItem = MediaItem.fromUri(uri)
+        newPlayer.setMediaItem(mediaItem)
+        newPlayer.prepare()
+        newPlayer.playWhenReady = false
+        newPlayer.seekTo(startPosMs)
+        Log.d(TAG, "Player initialized/updated for URI: $uri, seeking to $startPosMs ms. playWhenReady initially false.")
+    }
+
+    DisposableEffect(videoUri1, exoPlayer1) {
+        if (videoUri1 != null && exoPlayer1 == null) {
+            initializeOrUpdatePlayer(null, videoUri1, startPosition1Ms, { exoPlayer1 = it }, { videoAspectRatio1 = it }, { originalDuration1Ms = it })
+        }
+        onDispose {
+            if (videoUri1 == null) {
+                exoPlayer1?.release()
+                exoPlayer1 = null
+                Log.d(TAG, "Disposed and released exoPlayer1 because videoUri1 became null.")
+            }
+        }
+    }
+    DisposableEffect(videoUri2, exoPlayer2) {
+        if (videoUri2 != null && exoPlayer2 == null) {
+            initializeOrUpdatePlayer(null, videoUri2, startPosition2Ms, { exoPlayer2 = it }, { videoAspectRatio2 = it }, { originalDuration2Ms = it })
+        }
+        onDispose {
+            if (videoUri2 == null) {
+                exoPlayer2?.release()
+                exoPlayer2 = null
+                Log.d(TAG, "Disposed and released exoPlayer2 because videoUri2 became null.")
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            Log.d(TAG, "VideoScreen onDispose: Releasing players.")
+            exoPlayer1?.release()
+            exoPlayer1 = null
+            exoPlayer2?.release()
+            exoPlayer2 = null
+        }
+    }
+
+    LaunchedEffect(isPlaying, sharedMaxDurationMs) {
+        if (sharedMaxDurationMs <= 0) {
+            if (isPlaying) isPlaying = false
             return@LaunchedEffect
         }
-        val targetPos1 = (startPosition1Ms + sharedCurrentPositionMs).coerceIn(0L, originalDuration1Ms)
-        val targetPos2 = (startPosition2Ms + sharedCurrentPositionMs).coerceIn(0L, originalDuration2Ms)
 
-        exoPlayer1?.let { p -> if (abs(p.currentPosition - targetPos1) > SEEK_COMMAND_THRESHOLD_MS) p.seekTo(targetPos1); if (isPlaying && targetPos1 < originalDuration1Ms) p.play() else p.pause() }
-        exoPlayer2?.let { p -> if (abs(p.currentPosition - targetPos2) > SEEK_COMMAND_THRESHOLD_MS) p.seekTo(targetPos2); if (isPlaying && targetPos2 < originalDuration2Ms) p.play() else p.pause() }
-    }
+        if (isPlaying) {
+            var lastUpdateTime = System.currentTimeMillis()
+            exoPlayer1?.play()
+            exoPlayer2?.play()
+            Log.d(TAG, "LaunchedEffect: isPlaying is true. Advancing position. Player1.play() and Player2.play() called.")
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            if (isPlaying && !isSeeking) {
-                val p1RelPos = exoPlayer1?.let { (it.currentPosition - startPosition1Ms).coerceAtLeast(0L) }
-                val p2RelPos = exoPlayer2?.let { (it.currentPosition - startPosition2Ms).coerceAtLeast(0L) }
-                val potentialNewSharedPos = listOfNotNull(p1RelPos, p2RelPos).maxOrNull()
-                if (potentialNewSharedPos != null && potentialNewSharedPos != sharedCurrentPositionMs) {
-                    sharedCurrentPositionMs = potentialNewSharedPos.coerceIn(0L, sharedMaxDurationMs)
-                }
-                if (sharedMaxDurationMs > 0 && sharedCurrentPositionMs >= sharedMaxDurationMs) {
-                    sharedCurrentPositionMs = sharedMaxDurationMs; isPlaying = false
+            while (isPlaying && sharedCurrentPositionMs < sharedMaxDurationMs) {
+                delay(50)
+                if (!isPlaying) break
+
+                val currentTime = System.currentTimeMillis()
+                val elapsed = currentTime - lastUpdateTime
+                lastUpdateTime = currentTime
+
+                if (!isSeeking) {
+                    val newSharedPosition = (sharedCurrentPositionMs + elapsed).coerceAtMost(sharedMaxDurationMs)
+                    if (abs(newSharedPosition - sharedCurrentPositionMs) > 10) {
+                        sharedCurrentPositionMs = newSharedPosition
+                    }
+
+                    exoPlayer1?.let { player ->
+                        val targetPos1 = (startPosition1Ms + sharedCurrentPositionMs).coerceIn(0, originalDuration1Ms)
+                        if (abs(player.currentPosition - targetPos1) > SEEK_COMMAND_THRESHOLD_MS + 200) {
+                            player.seekTo(targetPos1)
+                        }
+                    }
+                    exoPlayer2?.let { player ->
+                        val targetPos2 = (startPosition2Ms + sharedCurrentPositionMs).coerceIn(0, originalDuration2Ms)
+                        if (abs(player.currentPosition - targetPos2) > SEEK_COMMAND_THRESHOLD_MS + 200) {
+                            player.seekTo(targetPos2)
+                        }
+                    }
                 }
             }
-            delay(100L)
+            if (sharedCurrentPositionMs >= sharedMaxDurationMs && isPlaying) {
+                isPlaying = false
+                Log.d(TAG, "LaunchedEffect: Playback reached end. Setting isPlaying to false.")
+            } else if (!isPlaying) {
+                Log.d(TAG, "LaunchedEffect: isPlaying became false during loop. Pausing players.")
+                exoPlayer1?.pause()
+                exoPlayer2?.pause()
+            }
+        } else {
+            Log.d(TAG, "LaunchedEffect: isPlaying is false. Pausing players.")
+            exoPlayer1?.pause()
+            exoPlayer2?.pause()
         }
     }
 
-    DisposableEffect(Unit) { onDispose { exoPlayer1?.release(); exoPlayer1 = null; exoPlayer2?.release(); exoPlayer2 = null } }
+    val togglePlayPause = {
+        if (exoPlayer1 != null || exoPlayer2 != null) {
+            val newIsPlayingState = !isPlaying
+            isPlaying = newIsPlayingState
+
+            if (newIsPlayingState) {
+                Log.d(TAG, "togglePlayPause: Set isPlaying to TRUE. Telling players to play.")
+                if (sharedCurrentPositionMs >= sharedMaxDurationMs && sharedMaxDurationMs > 0) {
+                    sharedCurrentPositionMs = 0L
+                    exoPlayer1?.seekTo(startPosition1Ms)
+                    exoPlayer2?.seekTo(startPosition2Ms)
+                    Log.d(TAG, "Playback reset to start as it was at the end.")
+                }
+                exoPlayer1?.play()
+                exoPlayer2?.play()
+            } else {
+                Log.d(TAG, "togglePlayPause: Set isPlaying to FALSE. Telling players to pause.")
+                exoPlayer1?.pause()
+                exoPlayer2?.pause()
+            }
+        }
+    }
+
+    val onSeek = { newPositionFraction: Float ->
+        if (sharedMaxDurationMs > 0) {
+            isSeeking = true
+            val newPosition = (newPositionFraction * sharedMaxDurationMs).toLong()
+            sharedCurrentPositionMs = newPosition.coerceIn(0L, sharedMaxDurationMs)
+
+            val targetPos1 = (startPosition1Ms + sharedCurrentPositionMs).coerceIn(0, originalDuration1Ms.coerceAtLeast(0L))
+            exoPlayer1?.seekTo(targetPos1)
+
+            val targetPos2 = (startPosition2Ms + sharedCurrentPositionMs).coerceIn(0, originalDuration2Ms.coerceAtLeast(0L))
+            exoPlayer2?.seekTo(targetPos2)
+
+            Log.d(TAG, "Seeked to: $sharedCurrentPositionMs ms (Player1: $targetPos1, Player2: $targetPos2)")
+
+            coroutineScope.launch { // Use coroutineScope to launch delay
+                delay(100)
+                isSeeking = false
+            }
+        }
+    }
+
+
+    if (showVideoSourceDialog) {
+        VideoSourceChooserDialog(
+            onDismissRequest = { showVideoSourceDialog = false },
+            onTakeVideoClick = {
+                launchCameraAction(context, videoPlayerTargetForDialog, takeVideoLauncher1, takeVideoLauncher2, requestCameraPermissionLauncher1, requestCameraPermissionLauncher2)
+            },
+            onSelectVideoClick = {
+                launchGalleryAction(context, videoPlayerTargetForDialog, selectVideoLauncher1, selectVideoLauncher2, requestStoragePermissionLauncher1, requestStoragePermissionLauncher2)
+            }
+        )
+    }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("動画解析") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "ホームに戻る") } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer, titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer, navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer)) }
-    ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.weight(1f))
-            Box(modifier = Modifier.weight(3f).fillMaxWidth()) {
-                val duration1Trimmed = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)
-                val currentPos1InTrimmed = sharedCurrentPositionMs.coerceAtMost(duration1Trimmed)
-                val duration2Trimmed = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)
-                val currentPos2InTrimmed = sharedCurrentPositionMs.coerceAtMost(duration2Trimmed)
+        topBar = {
+            TopAppBar(
+                title = { Text("動画比較 & 解析") },
+                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
+                actions = {
+                    IconButton(onClick = {
+                        val encodedUri1 = videoUri1?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
+                        val encodedUri2 = videoUri2?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
 
-                if (isHorizontalLayout) {
-                    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VideoPlayerBox(exoPlayer1, videoAspectRatio1, "Video 1", currentPos1InTrimmed, duration1Trimmed, onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxHeight())
-                        VideoPlayerBox(exoPlayer2, videoAspectRatio2, "Video 2", currentPos2InTrimmed, duration2Trimmed, onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        Log.d(TAG, "Navigating to StartPositionSettingScreen with durations: originalDuration1Ms = $originalDuration1Ms, originalDuration2Ms = $originalDuration2Ms, startPosition1Ms = $startPosition1Ms, startPosition2Ms = $startPosition2Ms")
+
+                        navController.navigate(
+                            "${AppDestinations.START_POSITION_SETTING_ROUTE}/$encodedUri1/$encodedUri2/$startPosition1Ms/$startPosition2Ms/$originalDuration1Ms/$originalDuration2Ms"
+                        )
+                    }) {
+                        Icon(Icons.Filled.Settings, "開始位置設定")
                     }
-                } else {
-                    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        VideoPlayerBox(exoPlayer1, videoAspectRatio1, "Video 1", currentPos1InTrimmed, duration1Trimmed, onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxWidth())
-                        VideoPlayerBox(exoPlayer2, videoAspectRatio2, "Video 2", currentPos2InTrimmed, duration2Trimmed, onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true }, modifier = Modifier.weight(1f).fillMaxWidth())
+                    IconButton(onClick = { isHorizontalLayout = !isHorizontalLayout }) {
+                        Icon(if (isHorizontalLayout) Icons.Filled.SwapVert else Icons.Filled.SwapHoriz, if (isHorizontalLayout) "縦並びに変更" else "横並びに変更")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                if (isHorizontalLayout) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        VideoPlayerBox(
+                            exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
+                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
+                            durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
+                            onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
+                        )
+                        if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier
+                            .width(4.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.surfaceVariant))
+                        VideoPlayerBox(
+                            exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
+                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
+                            durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
+                            onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
+                        )
+                    }
+                } else { // Vertical layout
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        VideoPlayerBox(
+                            exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
+                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
+                            durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
+                            onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (exoPlayer1 != null || exoPlayer2 != null) {
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        VideoPlayerBox(
+                            exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
+                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
+                            durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
+                            onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                IconButton(onClick = { isPlaying = !isPlaying }, modifier = Modifier.size(64.dp)) { Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) "Pause" else "Play", modifier = Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.primary) }
-                IconButton(onClick = { isHorizontalLayout = !isHorizontalLayout }, modifier = Modifier.size(56.dp)) { Icon(if (isHorizontalLayout) Icons.Filled.SwapVert else Icons.Filled.SwapHoriz, if (isHorizontalLayout) "Vertical" else "Horizontal", modifier = Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                val settingsEnabled = (videoUri1 != null && originalDuration1Ms > 0) || (videoUri2 != null && originalDuration2Ms > 0)
-                IconButton(
-                    onClick = {
-                        val v1UriEnc = videoUri1?.toString()?.let { URLEncoder.encode(it, StandardCharsets.UTF_8.name()) }
-                        val v2UriEnc = videoUri2?.toString()?.let { URLEncoder.encode(it, StandardCharsets.UTF_8.name()) }
-                        if (settingsEnabled) {
-                            var route = AppDestinations.START_POSITION_SETTING_ROUTE
-                            route += "?currentStart1Ms=$startPosition1Ms&currentStart2Ms=$startPosition2Ms&duration1Ms=$originalDuration1Ms&duration2Ms=$originalDuration2Ms"
-                            v1UriEnc?.let { route += "&video1Uri=$it" }; v2UriEnc?.let { route += "&video2Uri=$it" }
-                            Log.d(TAG, "Navigating to StartPositionSettingScreen with route: $route")
-                            navController.navigate(route)
-                        }
-                    },
-                    enabled = settingsEnabled,
-                    modifier = Modifier.size(56.dp)
-                ) { Icon(Icons.Filled.Settings, "開始位置設定", modifier = Modifier.fillMaxSize(), tint = if (settingsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)) }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(formatTime(sharedCurrentPositionMs), style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.width(8.dp))
-                Slider(
-                    value = if (sharedMaxDurationMs > 0) sharedCurrentPositionMs.toFloat() / sharedMaxDurationMs.toFloat() else 0f,
-                    onValueChange = { newValue -> isSeeking = true; sharedCurrentPositionMs = (newValue * sharedMaxDurationMs).toLong().coerceIn(0L, sharedMaxDurationMs) },
-                    onValueChangeFinished = { isSeeking = false },
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(formatTime(sharedMaxDurationMs), style = MaterialTheme.typography.bodySmall)
-            }
-            if (isSeeking || (isPlaying && (exoPlayer1?.isLoading == true || exoPlayer2?.isLoading == true))) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
 
-    if (showVideoSourceDialog && videoPlayerTargetForDialog != 0) {
-        val currentLocalContext = LocalContext.current
-        VideoSourceChooserDialog(
-            onDismissRequest = { showVideoSourceDialog = false; videoPlayerTargetForDialog = 0 },
-            onTakeVideoClick = { launchCameraAction(currentLocalContext, videoPlayerTargetForDialog, takeVideoLauncher1, takeVideoLauncher2, requestCameraPermissionLauncher1, requestCameraPermissionLauncher2) },
-            onSelectVideoClick = { launchGalleryAction(currentLocalContext, videoPlayerTargetForDialog, selectVideoLauncher1, selectVideoLauncher2, requestStoragePermissionLauncher1, requestStoragePermissionLauncher2) }
-        )
+
+            // Controls section
+            if (sharedMaxDurationMs > 0) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text(formatTime(sharedCurrentPositionMs), style = MaterialTheme.typography.bodySmall)
+                        Text(formatTime(sharedMaxDurationMs), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Slider(
+                        value = if (sharedMaxDurationMs > 0) sharedCurrentPositionMs.toFloat() / sharedMaxDurationMs.toFloat() else 0f,
+                        onValueChange = { onSeek(it) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.height(56.dp)) // Placeholder for controls height when no video
+            }
+
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp, horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(onClick = togglePlayPause, enabled = sharedMaxDurationMs > 0) {
+                    Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "一時停止" else "再生")
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(if (isPlaying) "一時停止" else "再生")
+                }
+            }
+        }
     }
 }
 

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
+import com.example.swimminganalysisapplication.navigation.AppDestinations
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -94,10 +95,39 @@ const val CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX = "CreatePracticeMenuDragOffs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreatePracticeMenuScreen(navController: NavController) {
+fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: String?) { // practiceMenuId を引数として受け取る
     var menuTitle by rememberSaveable { mutableStateOf("") }
     var menuDescription by rememberSaveable { mutableStateOf("") }
     val practiceMenuItems = remember { mutableStateListOf<PracticeMenuItem>() }
+
+    val isEditing = practiceMenuId != null
+    val screenTitle = if (isEditing) "練習メニュー編集" else "練習メニュー作成"
+
+    // 編集中にロードしたかどうかのフラグ (実際のロード処理はTODO)
+    var initialLoadDone by remember { mutableStateOf(!isEditing) }
+
+
+    LaunchedEffect(practiceMenuId, initialLoadDone) {
+        if (isEditing && !initialLoadDone) {
+            Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "Editing menu with ID: $practiceMenuId. Attempting to load data.")
+            // TODO: practiceMenuId を使って実際のメニューデータをロードする
+            // 例: viewModel.loadPracticeMenu(practiceMenuId)
+            // 以下はダミーデータのロード (実際には非同期処理になることが多い)
+            if (practiceMenuId == "dummy_id_1") { // 仮のIDでロードをシミュレート
+                menuTitle = "編集中のメニュータイトル1"
+                menuDescription = "編集中のメニュー説明1"
+                practiceMenuItems.clear()
+                practiceMenuItems.add(PracticeMenuItem(drillName = "編集項目1", distance = "100m"))
+            } else if (practiceMenuId.isNotBlank()) { // ダミーID以外でIDがある場合
+                menuTitle = "取得したタイトル ($practiceMenuId)"
+                menuDescription = "取得した説明"
+                practiceMenuItems.clear()
+                practiceMenuItems.add(PracticeMenuItem(drillName = "取得した項目1", distance = "50m"))
+            }
+            initialLoadDone = true // ロード処理（シミュレーション）完了
+        }
+    }
+
 
     var showAddItemDialog by remember { mutableStateOf(false) }
     var tempDrillName by remember { mutableStateOf("") }
@@ -113,7 +143,7 @@ fun CreatePracticeMenuScreen(navController: NavController) {
 
     val density = LocalDensity.current
     val itemHeights = remember { mutableStateMapOf<String, Int>() }
-    val defaultItemHeightPx = with(density) { 75.dp.roundToPx() } // Generic default height
+    val defaultItemHeightPx = with(density) { 75.dp.roundToPx() }
 
     val lazyListState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -140,12 +170,38 @@ fun CreatePracticeMenuScreen(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("練習メニュー作成") },
+                title = { Text(screenTitle) }, // タイトルを動的に変更
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
                 actions = {
                     Button(onClick = {
-                        val menuToLog = PracticeMenu(title = menuTitle, description = menuDescription, items = practiceMenuItems)
+                        val currentMenuId = practiceMenuId ?: UUID.randomUUID().toString() // 編集時は既存ID、新規は新規ID
+                        val menuToLog = PracticeMenu(id = currentMenuId, title = menuTitle, description = menuDescription, items = practiceMenuItems)
                         Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "Save: ${menuToLog.toString()}")
+                        // TODO: Actually save the menu (e.g., to ViewModel or Repository)
+                        // isEditing フラグや currentMenuId を使って新規保存か更新かを判断する
+
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle?.apply {
+                                set("newPracticeMenuAdded", true)
+                                set("newMenuTitle", menuTitle.ifBlank { "無題のメニュー" }) // タイトルも渡す
+                                set("updatedMenuId", currentMenuId) // 更新されたメニューのIDも渡す（オプション）
+                            }
+
+
+                        // PracticeListScreenに戻る
+                        // popBackStack は、指定したルートがバックスタックに見つからない場合、クラッシュする可能性があるため注意。
+                        // navigate で launchSingleTop と popUpTo を使う方が安全な場合もある。
+                        if (navController.previousBackStackEntry?.destination?.route?.startsWith(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) == true ||
+                            navController.graph.findNode(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) != null ) {
+                            navController.popBackStack(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE, inclusive = false)
+                        } else {
+                            // フォールバックとしてHomeに飛ばしてからPracticeListに遷移など、アプリのフローによる
+                            navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
+                                popUpTo(AppDestinations.HOME_SCREEN_ROUTE) // 安全な基点まで戻る
+                                launchSingleTop = true
+                            }
+                        }
+
                     }) { Text("保存") }
                 }
             )
@@ -202,26 +258,24 @@ fun CreatePracticeMenuScreen(navController: NavController) {
                                     alpha = if (isBeingDragged && practiceMenuItems.size > 1) 0.9f else 1.0f
                                 }
                                 .zIndex(if (isBeingDragged) 1f else 0f)
-                                .pointerInput(menuItem.id) { // Keyed by item's stable ID
+                                .pointerInput(menuItem.id) {
                                     detectDragGesturesAfterLongPress(
                                         onDragStart = {
                                             if (draggedItemIndex == null && practiceMenuItems.size > 1) {
                                                 val heightFromMap = itemHeights[menuItem.id]
                                                 draggedItemHeightPx = heightFromMap ?: defaultItemHeightPx
-                                                draggedItemIndex = index // This 'index' is from itemsIndexed, current visual index
+                                                draggedItemIndex = index
                                                 dragOffsetY = 0f
                                                 Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "onDragStart: User touched item ID ${menuItem.id} at visual index $index. Height from map: $heightFromMap, Fallback used: ${heightFromMap == null}. Set draggedItemHeightPx: $draggedItemHeightPx")
                                             }
                                         },
                                         onDrag = { change, dragAmount ->
-                                            if (draggedItemIndex == index) { // Ensure this drag event is for the currently dragged item
+                                            if (draggedItemIndex == index) {
                                                 change.consume()
                                                 dragOffsetY += dragAmount.y
 
                                                 var currentItemOriginalTopY = 0f
-                                                // Calculate Y pos of the top of the dragged item's original slot
-                                                // 'draggedItemIndex' here refers to the index at the start of the drag
-                                                for(i in 0 until (draggedItemIndex ?: 0) ) { // Iterate up to the original index of the dragged item
+                                                for(i in 0 until (draggedItemIndex ?: 0) ) {
                                                     currentItemOriginalTopY += (itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx)
                                                 }
 
@@ -239,13 +293,10 @@ fun CreatePracticeMenuScreen(navController: NavController) {
                                                 }
                                                 dropTargetIndex = newDropTargetIndex
 
-                                                // --- Auto-scroll logic (copied, ensure variable names are consistent) ---
                                                 val scrollThresholdDp = 56.dp
                                                 val scrollSpeedPx = 10f
                                                 val scrollThresholdPx = with(density) { scrollThresholdDp.toPx() }
 
-                                                // Calculate visual top of dragged item within the viewport
-                                                // This needs the offset of the draggedItemIndex'th item in the current layout
                                                 var draggedItemActualTopYInList = 0f
                                                 for(i in 0 until (draggedItemIndex ?: 0)) {
                                                     draggedItemActualTopYInList += (itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx)
@@ -254,7 +305,6 @@ fun CreatePracticeMenuScreen(navController: NavController) {
                                                 val draggedItemVisualTopInViewport = (draggedItemActualTopYInList + dragOffsetY) - lazyListState.firstVisibleItemScrollOffset
                                                 val draggedItemVisualBottomInViewport = draggedItemVisualTopInViewport + draggedItemHeightPx
                                                 val viewportHeight = lazyListState.layoutInfo.viewportSize.height
-
 
                                                 var performScroll: Float? = null
                                                 if (viewportHeight > 0) {
@@ -342,7 +392,6 @@ fun DropIndicator() {
     )
 }
 
-// --- PracticeItemInputDialog (変更なし) ---
 @Composable
 fun PracticeItemInputDialog(
     drillName: String, onDrillNameChange: (String) -> Unit,
@@ -358,16 +407,50 @@ fun PracticeItemInputDialog(
         title = { Text("メニュー項目を追加") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = drillName, onValueChange = onDrillNameChange, label = { Text("種目/ドリル名 *") }, singleLine = true)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = distance, onValueChange = onDistanceChange, label = { Text("距離") }, modifier = Modifier.weight(1f), singleLine = true)
-                    OutlinedTextField(value = repetitions, onValueChange = onRepetitionsChange, label = { Text("本数/セット") }, modifier = Modifier.weight(1f), singleLine = true)
+                OutlinedTextField(
+                    value = drillName,
+                    onValueChange = onDrillNameChange,
+                    label = { Text("種目/ドリル名 *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = distance,
+                        onValueChange = onDistanceChange,
+                        label = { Text("距離") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = repetitions,
+                        onValueChange = onRepetitionsChange,
+                        label = { Text("本数/セット") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
                 }
-                OutlinedTextField(value = rest, onValueChange = onRestChange, label = { Text("休憩/サイクル") }, singleLine = true)
-                OutlinedTextField(value = notes, onValueChange = onNotesChange, label = { Text("メモ (任意)") }, minLines = 2)
+                OutlinedTextField(
+                    value = rest,
+                    onValueChange = onRestChange,
+                    label = { Text("休憩/サイクル") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = onNotesChange,
+                    label = { Text("メモ (任意)") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = { Button(onClick = onConfirm) { Text("完了") } },
         dismissButton = { Button(onClick = onDismissRequest) { Text("キャンセル") } }
     )
 }
+
