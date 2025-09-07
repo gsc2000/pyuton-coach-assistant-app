@@ -4,11 +4,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen // SplashScreenのインポート
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,13 +25,17 @@ import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerScreen
 import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerViewModelFactory
 import com.example.swimminganalysisapplication.ui.home.HomeScreen
+import com.example.swimminganalysisapplication.ui.login.CreateAccountScreen // New import
+import com.example.swimminganalysisapplication.ui.login.LoginScreen // New import
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.DiscoverScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersViewModelFactory
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
 import com.example.swimminganalysisapplication.ui.video.StartPositionSettingScreen
 import com.example.swimminganalysisapplication.ui.video.VideoScreen
+import com.example.swimminganalysisapplication.ui.menucomments.MenuCommentsScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -35,9 +44,7 @@ class MainActivity : ComponentActivity() {
     private val addSwimmerViewModelFactory by lazy { AddSwimmerViewModelFactory(swimmingRepository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Handle the splash screen transition.
-        installSplashScreen() // スプラッシュスクリーンのインストール
-
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
@@ -50,8 +57,23 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = AppDestinations.HOME_SCREEN_ROUTE
+                        startDestination = AppDestinations.LOGIN_SCREEN_ROUTE // Start destination changed
                     ) {
+                        composable(
+                            route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE,
+                            arguments = listOf(navArgument("menuId") { type = NavType.StringType; nullable = true })
+                        ) { backStackEntry ->
+                            val menuId = backStackEntry.arguments?.getString("menuId")
+                            // practiceMenusリストの参照をMenuCommentsScreenに渡すか、
+                            // またはMenuCommentsScreen内のRepositoryに事前に設定しておく必要がある
+                            MenuCommentsScreen(navController = navController, menuId = menuId)
+                        }
+                        composable(AppDestinations.LOGIN_SCREEN_ROUTE) { // New route
+                            LoginScreen(navController = navController)
+                        }
+                        composable(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE) { // New route
+                            CreateAccountScreen(navController = navController)
+                        }
                         composable(AppDestinations.HOME_SCREEN_ROUTE) {
                             HomeScreen(navController = navController)
                         }
@@ -98,15 +120,13 @@ class MainActivity : ComponentActivity() {
                                 duration2Ms = duration2MsArg
                             )
                         }
+                        // ★ DiscoverScreen のルートを追加
+                        composable(AppDestinations.DISCOVER_SCREEN_ROUTE) {
+                            DiscoverScreen(navController = navController)
+                        }
                         composable(
-                            route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE,
-                            arguments = listOf(
-                                navArgument("menuId") {
-                                    type = NavType.StringType
-                                    nullable = true
-                                    defaultValue = null
-                                }
-                            )
+                            route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE, // 引数ありルート
+                            arguments = listOf(navArgument("menuId") { type = NavType.StringType; nullable = true })
                         ) { backStackEntry ->
                             val menuId = backStackEntry.arguments?.getString("menuId")
                             CreatePracticeMenuScreen(navController = navController, practiceMenuId = menuId)

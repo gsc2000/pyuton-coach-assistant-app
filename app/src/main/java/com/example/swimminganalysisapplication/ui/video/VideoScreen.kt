@@ -61,6 +61,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu // ★ AccountActionsMenu をインポート
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch // Import launch
 import java.net.URLEncoder
@@ -532,8 +533,12 @@ fun VideoScreen(navController: NavController) {
                     IconButton(onClick = { isHorizontalLayout = !isHorizontalLayout }) {
                         Icon(if (isHorizontalLayout) Icons.Filled.SwapVert else Icons.Filled.SwapHoriz, if (isHorizontalLayout) "縦並びに変更" else "横並びに変更")
                     }
+                    AccountActionsMenu(navController = navController) // ★ AccountActionsMenu を追加
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を更新
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer // ★ onPrimaryContainer を追加
+                )
             )
         }
     ) { paddingValues ->
@@ -635,4 +640,3 @@ fun VideoScreen(navController: NavController) {
         }
     }
 }
-

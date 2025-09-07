@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -95,39 +96,33 @@ const val CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX = "CreatePracticeMenuDragOffs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: String?) { // practiceMenuId を引数として受け取る
+fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: String?) {
     var menuTitle by rememberSaveable { mutableStateOf("") }
     var menuDescription by rememberSaveable { mutableStateOf("") }
     val practiceMenuItems = remember { mutableStateListOf<PracticeMenuItem>() }
 
     val isEditing = practiceMenuId != null
     val screenTitle = if (isEditing) "練習メニュー編集" else "練習メニュー作成"
-
-    // 編集中にロードしたかどうかのフラグ (実際のロード処理はTODO)
     var initialLoadDone by remember { mutableStateOf(!isEditing) }
-
 
     LaunchedEffect(practiceMenuId, initialLoadDone) {
         if (isEditing && !initialLoadDone) {
             Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "Editing menu with ID: $practiceMenuId. Attempting to load data.")
             // TODO: practiceMenuId を使って実際のメニューデータをロードする
-            // 例: viewModel.loadPracticeMenu(practiceMenuId)
-            // 以下はダミーデータのロード (実際には非同期処理になることが多い)
-            if (practiceMenuId == "dummy_id_1") { // 仮のIDでロードをシミュレート
+            if (practiceMenuId == "dummy_id_1") {
                 menuTitle = "編集中のメニュータイトル1"
                 menuDescription = "編集中のメニュー説明1"
                 practiceMenuItems.clear()
                 practiceMenuItems.add(PracticeMenuItem(drillName = "編集項目1", distance = "100m"))
-            } else if (practiceMenuId.isNotBlank()) { // ダミーID以外でIDがある場合
+            } else if (practiceMenuId.isNotBlank()) {
                 menuTitle = "取得したタイトル ($practiceMenuId)"
                 menuDescription = "取得した説明"
                 practiceMenuItems.clear()
                 practiceMenuItems.add(PracticeMenuItem(drillName = "取得した項目1", distance = "50m"))
             }
-            initialLoadDone = true // ロード処理（シミュレーション）完了
+            initialLoadDone = true
         }
     }
-
 
     var showAddItemDialog by remember { mutableStateOf(false) }
     var tempDrillName by remember { mutableStateOf("") }
@@ -170,40 +165,37 @@ fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: Strin
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(screenTitle) }, // タイトルを動的に変更
+                title = { Text(screenTitle) },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
                 actions = {
                     Button(onClick = {
-                        val currentMenuId = practiceMenuId ?: UUID.randomUUID().toString() // 編集時は既存ID、新規は新規ID
+                        val currentMenuId = practiceMenuId ?: UUID.randomUUID().toString()
                         val menuToLog = PracticeMenu(id = currentMenuId, title = menuTitle, description = menuDescription, items = practiceMenuItems)
                         Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "Save: ${menuToLog.toString()}")
-                        // TODO: Actually save the menu (e.g., to ViewModel or Repository)
-                        // isEditing フラグや currentMenuId を使って新規保存か更新かを判断する
+                        // TODO: Actually save the menu
 
                         navController.previousBackStackEntry
                             ?.savedStateHandle?.apply {
                                 set("newPracticeMenuAdded", true)
-                                set("newMenuTitle", menuTitle.ifBlank { "無題のメニュー" }) // タイトルも渡す
-                                set("updatedMenuId", currentMenuId) // 更新されたメニューのIDも渡す（オプション）
+                                set("newMenuTitle", menuTitle.ifBlank { "無題のメニュー" })
+                                set("updatedMenuId", currentMenuId)
                             }
-
-
-                        // PracticeListScreenに戻る
-                        // popBackStack は、指定したルートがバックスタックに見つからない場合、クラッシュする可能性があるため注意。
-                        // navigate で launchSingleTop と popUpTo を使う方が安全な場合もある。
                         if (navController.previousBackStackEntry?.destination?.route?.startsWith(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) == true ||
                             navController.graph.findNode(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) != null ) {
                             navController.popBackStack(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE, inclusive = false)
                         } else {
-                            // フォールバックとしてHomeに飛ばしてからPracticeListに遷移など、アプリのフローによる
                             navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
-                                popUpTo(AppDestinations.HOME_SCREEN_ROUTE) // 安全な基点まで戻る
+                                popUpTo(AppDestinations.HOME_SCREEN_ROUTE)
                                 launchSingleTop = true
                             }
                         }
-
                     }) { Text("保存") }
-                }
+                    AccountActionsMenu(navController = navController)
+                },
+                colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を追加
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         },
         floatingActionButton = {
@@ -218,7 +210,7 @@ fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: Strin
                 .fillMaxSize()
                 .padding(paddingValuesFromScaffold)
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 72.dp)
+                .padding(bottom = 72.dp) // Consider adjusting if FAB overlaps content
         ) {
             OutlinedTextField(value = menuTitle,onValueChange = { menuTitle = it },label = { Text("メニュータイトル") },modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(16.dp))
@@ -230,7 +222,7 @@ fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: Strin
             LazyColumn(
                 state = lazyListState,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp) // No extra space between items needed, handled by PracticeMenuItemRow's padding
             ) {
                 if (practiceMenuItems.isEmpty() && draggedItemIndex == null) {
                     item {
@@ -366,7 +358,7 @@ fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: Strin
                                         itemHeights.remove(practiceMenuItems[index].id)
                                         practiceMenuItems.removeAt(index)
                                         if (dropTargetIndex != null && dropTargetIndex!! >= practiceMenuItems.size) {
-                                            dropTargetIndex = null
+                                            dropTargetIndex = null // Avoid index out of bounds if last item was target
                                         }
                                     }
                                 }
@@ -388,9 +380,10 @@ fun DropIndicator() {
     Divider(
         color = MaterialTheme.colorScheme.primary,
         thickness = 2.dp,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp) // Small vertical padding so it doesn't touch items
     )
 }
+
 
 @Composable
 fun PracticeItemInputDialog(

@@ -20,6 +20,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu // ★ AccountActionsMenu をインポート
 
 // Helper function to format time (can be moved to a common utils file if used elsewhere)
 private fun formatTime(millis: Long): String {
@@ -95,7 +96,12 @@ fun StartPositionSettingScreen(
                     }) {
                         Text("完了")
                     }
-                }
+                    AccountActionsMenu(navController = navController) // ★ AccountActionsMenu を追加
+                },
+                colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を追加
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         }
     ) { paddingValues ->

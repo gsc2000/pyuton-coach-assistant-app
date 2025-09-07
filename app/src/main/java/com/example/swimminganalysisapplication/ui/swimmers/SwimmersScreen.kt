@@ -5,7 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add // ★ Addアイコンをimport
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -16,7 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Swimmer
-import com.example.swimminganalysisapplication.navigation.AppDestinations // ★ AppDestinationsをimport
+import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu // ★ AccountActionsMenu をインポート
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,10 +39,17 @@ fun SwimmersScreen(
                             contentDescription = "戻る"
                         )
                     }
-                }
+                },
+                actions = { // ★ actions スロットに AccountActionsMenu を追加
+                    AccountActionsMenu(navController = navController)
+                },
+                colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を追加
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         },
-        floatingActionButton = { // ★ FABを追加
+        floatingActionButton = {
             FloatingActionButton(onClick = {
                 navController.navigate(AppDestinations.ADD_SWIMMER_ROUTE)
             }) {
@@ -106,3 +114,4 @@ fun SwimmerItem(swimmer: Swimmer) {
         }
     }
 }
+

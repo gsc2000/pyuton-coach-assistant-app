@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu // ★ AccountActionsMenu をインポート
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +52,14 @@ fun AddSwimmerScreen(
                             contentDescription = "戻る"
                         )
                     }
-                }
+                },
+                actions = { // ★ actions スロットに AccountActionsMenu を追加
+                    AccountActionsMenu(navController = navController)
+                },
+                colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を追加
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         }
     ) { paddingValues ->
@@ -104,3 +112,4 @@ fun AddSwimmerScreen(
         }
     }
 }
+
