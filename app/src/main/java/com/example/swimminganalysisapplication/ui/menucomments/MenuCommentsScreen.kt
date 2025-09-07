@@ -1,5 +1,6 @@
 package com.example.swimminganalysisapplication.ui.menucomments
 
+import android.util.Log // デバッグ用
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,41 +17,34 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
-import com.example.swimminganalysisapplication.ui.practicemenu.Comment // ★ Commentをインポート
-import com.example.swimminganalysisapplication.ui.practicemenu.PracticeMenuItemDisplay // ★ PracticeMenuItemDisplayをインポート
+import com.example.swimminganalysisapplication.ui.practicemenu.Comment
+import com.example.swimminganalysisapplication.ui.practicemenu.PracticeMenuItemDisplay
+// ★★★ 正しい PracticeMenuRepository をインポート ★★★
+import com.example.swimminganalysisapplication.ui.practicemenu.PracticeMenuRepository
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// 仮のデータ置き場（ViewModelやRepositoryができるまでの代替）
-// 実際にはViewModel経由でPracticeListScreenのデータを参照・更新する
-object PracticeMenuRepository {
-    var menus: MutableList<PracticeMenuItemDisplay> = mutableStateListOf() // PracticeListScreenのpracticeMenusを指すようにしたい
-
-    fun findMenuById(menuId: String?): PracticeMenuItemDisplay? {
-        return menus.find { it.id == menuId }
-    }
-
-    fun addCommentToMenu(menuId: String?, comment: Comment) {
-        findMenuById(menuId)?.comments?.add(comment)
-    }
-}
-
+// ★★★ このファイル内にあった PracticeMenuRepository の object 定義は削除されているはずです ★★★
+// object PracticeMenuRepository { ... } // ← これがないことを確認！
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MenuCommentsScreen(
     navController: NavController,
     menuId: String?,
-    // この画面からPracticeListScreenのpracticeMenusを直接編集するのは推奨されないが、
-    // プロトタイプとして一時的にPracticeMenuRepository経由でアクセスする
 ) {
-    // PracticeListScreenが保持している実際のメニューリストにアクセスする
-    // 本来はViewModelでmenuIdに対応するメニューとそのコメントを取得・管理する
-    val menu = remember(menuId) { PracticeMenuRepository.findMenuById(menuId) }
-    var newCommentText by remember { mutableStateOf("") }
+    // デバッグログ
+    Log.d("MenuCommentsScreen", "Screen Composed. Received menuId: $menuId")
+    Log.d("MenuCommentsScreen", "Shared PracticeMenuRepository instance: ${PracticeMenuRepository.hashCode()}") // インスタンス確認
+    Log.d("MenuCommentsScreen", "Menus in shared repository: ${PracticeMenuRepository.menus.map { it.id to it.title }}")
 
-    // menuがnullの場合の処理（エラー表示や前の画面に戻るなど）
+    // 共有された PracticeMenuRepository インスタンスを使用
+    val menu = remember(menuId) { PracticeMenuRepository.findMenuById(menuId) }
+
+    Log.d("MenuCommentsScreen", "Menu found by ID '$menuId': ${menu?.title}")
+
     if (menu == null) {
         Scaffold(
             topBar = {
@@ -60,26 +54,18 @@ fun MenuCommentsScreen(
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    }
                 )
             }
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("メニューが見つかりませんでした。")
+                Text("メニューが見つかりませんでした。 (ID: $menuId)")
             }
         }
         return
     }
 
-    // menu.comments を監視してUIを再コンポーズする
-    // ただし、PracticeMenuRepository.menus が mutableStateListOf であっても、
-    // menu.comments (ただのMutableList) の変更は直接この画面の再コンポーズをトリガーしない可能性がある。
-    // そのため、menuオブジェクト自体か、menu.comments.sizeなどをLaunchedEffectのキーにするなどの工夫が必要になる場合がある。
-    // 今回はPracticeMenuRepository.menusがPracticeListScreenのrememberされたStateListを指す前提で進める。
+    var newCommentText by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -90,9 +76,7 @@ fun MenuCommentsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                     }
                 },
-                actions = {
-                    AccountActionsMenu(navController = navController)
-                },
+                actions = { AccountActionsMenu(navController = navController) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -100,7 +84,7 @@ fun MenuCommentsScreen(
             )
         },
         bottomBar = {
-            Surface(shadowElevation = 8.dp) { // 入力欄に影をつけて区別しやすくする
+            Surface(shadowElevation = 8.dp) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -118,10 +102,9 @@ fun MenuCommentsScreen(
                     IconButton(
                         onClick = {
                             if (newCommentText.isNotBlank()) {
-                                // 仮の投稿者名。実際にはログインユーザー情報を使う
-                                val comment = Comment(authorName = "現在のユーザー", text = newCommentText)
-                                PracticeMenuRepository.addCommentToMenu(menuId, comment)
-                                newCommentText = "" // 入力欄をクリア
+                                val comment = Comment(authorName = "現在のユーザー", text = newCommentText) // 仮の投稿者
+                                PracticeMenuRepository.addCommentToMenu(menuId, comment) // 正しいリポジトリのメソッドを呼ぶ
+                                newCommentText = ""
                             }
                         },
                         enabled = newCommentText.isNotBlank()
@@ -135,10 +118,10 @@ fun MenuCommentsScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Scaffoldからのpaddingを適用
-                .padding(horizontal = 16.dp), // さらに左右のpaddingを追加
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp) // リスト自体の上下padding
+            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
         ) {
             if (menu.comments.isEmpty()) {
                 item {
@@ -152,7 +135,7 @@ fun MenuCommentsScreen(
                     )
                 }
             } else {
-                items(menu.comments, key = { it.id }) { comment ->
+                items(menu.comments.sortedByDescending { it.timestamp }, key = { it.id }) { comment -> // コメントを新しい順にソートする例
                     CommentItem(comment)
                 }
             }

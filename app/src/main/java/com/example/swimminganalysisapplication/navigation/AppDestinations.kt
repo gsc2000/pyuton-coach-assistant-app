@@ -14,6 +14,7 @@ object AppDestinations {
     const val PRACTICE_LIST_SCREEN_ROUTE = "practice_list_screen" // New route for practice list
     const val MENU_COMMENTS_ROUTE = "menu_comments" // パラメータなしのベースルート
     const val MENU_COMMENTS_WITH_ARG_ROUTE = "menu_comments/{menuId}" // menuIdを引数として取る
-    const val DISCOVER_SCREEN_ROUTE = "discover_menus" // ★ 新規追加
+    const val DISCOVER_SCREEN_ROUTE = "discover_menus"
+    const val FAVORITES_SCREEN_ROUTE = "favorites_screen"
 }
 

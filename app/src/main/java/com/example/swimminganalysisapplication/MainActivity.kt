@@ -30,6 +30,7 @@ import com.example.swimminganalysisapplication.ui.login.LoginScreen // New impor
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.DiscoverScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.FavoritesScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersScreen
 import com.example.swimminganalysisapplication.ui.swimmers.SwimmersViewModelFactory
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
@@ -133,6 +134,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
                             PracticeListScreen(navController = navController)
+                        }
+                        composable(AppDestinations.FAVORITES_SCREEN_ROUTE) { // ★ これが追加されていることを確認
+                            FavoritesScreen(navController = navController)
                         }
                     }
                 }
