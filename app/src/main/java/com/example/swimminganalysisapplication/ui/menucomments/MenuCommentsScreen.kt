@@ -26,9 +26,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// ★★★ このファイル内にあった PracticeMenuRepository の object 定義は削除されているはずです ★★★
-// object PracticeMenuRepository { ... } // ← これがないことを確認！
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MenuCommentsScreen(
