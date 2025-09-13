@@ -152,12 +152,6 @@ fun HomeScreen(navController: NavController) {
             )
 
             HomeNavigationCard(
-                title = "選手一覧",
-                icon = Icons.AutoMirrored.Filled.ListAlt,
-                onClick = { navController.navigate(AppDestinations.SWIMMERS_SCREEN_ROUTE) }
-            )
-
-            HomeNavigationCard(
                 title = "練習メニュー",
                 icon = Icons.Filled.PostAdd,
                 onClick = { navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) }

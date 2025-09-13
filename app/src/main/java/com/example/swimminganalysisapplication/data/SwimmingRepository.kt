@@ -2,110 +2,110 @@ package com.example.swimminganalysisapplication.data
 
 import android.util.Log
 import com.example.swimminganalysisapplication.data.remote.ApiService
-import com.example.swimminganalysisapplication.data.remote.model.Race
-import com.example.swimminganalysisapplication.data.remote.model.Result
-import com.example.swimminganalysisapplication.data.remote.model.Swimmer
-import com.example.swimminganalysisapplication.data.remote.model.SwimmerRequest
+import com.example.swimminganalysisapplication.data.remote.model.Comment
+import com.example.swimminganalysisapplication.data.remote.model.Favorite
+import com.example.swimminganalysisapplication.data.remote.model.PracticeMenu
+import com.example.swimminganalysisapplication.data.remote.model.User
+import java.util.UUID
 
 class SwimmingRepository(private val apiService: ApiService) {
 
-    private fun <T> handleResponse(response: retrofit2.Response<T>, successMessage: String, entityName: String, operation: String, entityId: Int? = null): T? {
-        if (response.isSuccessful) {
-            Log.i("SwimmingRepository", "$successMessage - $entityName ${entityId?.toString() ?: ""} $operation successful.")
-            return response.body()
-        } else {
-            val errorMsg = "Failed to $operation $entityName ${entityId?.toString() ?: ""}: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
-            Log.e("SwimmingRepository", errorMsg)
-            throw ApiException("$operation $entityName に失敗しました: ${response.code()}")
+    private suspend fun <T> handleResponse(
+        apiCall: suspend () -> retrofit2.Response<T>,
+        successMessage: String,
+        operation: String
+    ): T? {
+        try {
+            val response = apiCall()
+            if (response.isSuccessful) {
+                Log.i("SwimmingRepository", "$successMessage - $operation successful.")
+                return response.body()
+            } else {
+                val errorMsg = "Failed to $operation: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
+                Log.e("SwimmingRepository", errorMsg)
+                throw ApiException("$operation に失敗しました: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            Log.e("SwimmingRepository", "Exception during $operation: ${e.message}", e)
+            throw ApiException("$operation 中に例外が発生しました: ${e.message}")
         }
     }
 
-    private fun <T> handleListResponse(response: retrofit2.Response<List<T>>, entityNamePlural: String): List<T> {
-        if (response.isSuccessful) {
-            Log.i("SwimmingRepository", "Successfully fetched all $entityNamePlural.")
-            return response.body() ?: emptyList()
-        } else {
-            val errorMsg = "Failed to get all $entityNamePlural: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
-            Log.e("SwimmingRepository", errorMsg)
-            throw ApiException("$entityNamePlural の取得に失敗しました: ${response.code()}")
-        }
+
+    // --- Auth ---
+    suspend fun register(user: Map<String, String>): User? {
+        return handleResponse({ apiService.register(user) }, "User registered", "register")
     }
 
-    private fun handleDeleteResponse(response: retrofit2.Response<Unit>, entityName: String, entityId: Int): Boolean {
-        if (response.isSuccessful) {
-            Log.i("SwimmingRepository", "$entityName $entityId deleted successfully.")
-            return true
-        } else {
-            val errorMsg = "Failed to delete $entityName $entityId: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
-            Log.e("SwimmingRepository", errorMsg)
-            throw ApiException("$entityName の削除に失敗しました: ${response.code()}")
-        }
+    suspend fun login(credentials: Map<String, String>): Map<String, String>? {
+        return handleResponse({ apiService.login(credentials) }, "User logged in", "login")
     }
 
-    // --- Swimmer ---
-    suspend fun getAllSwimmers(): List<Swimmer> {
-        return handleListResponse(apiService.getAllSwimmers(), "swimmers")
+    suspend fun getMe(): User? {
+        return handleResponse({ apiService.getMe() }, "Fetched user profile", "getMe")
     }
 
-    suspend fun getSwimmer(id: Int): Swimmer? {
-        return handleResponse(apiService.getSwimmer(id), "Fetched swimmer", "Swimmer", "get", id)
+    // --- PracticeMenu ---
+    suspend fun createMenu(practiceMenu: PracticeMenu): PracticeMenu? {
+        return handleResponse({ apiService.createMenu(practiceMenu) }, "Created menu", "createMenu")
     }
 
-    suspend fun createSwimmer(swimmer: SwimmerRequest): Swimmer? {
-        return handleResponse(apiService.createSwimmer(swimmer), "Created swimmer", "Swimmer", "create")
+    suspend fun getMyMenus(): List<PracticeMenu>? {
+        return handleResponse({ apiService.getMyMenus() }, "Fetched my menus", "getMyMenus")
     }
 
-    suspend fun updateSwimmer(id: Int, swimmer: Swimmer): Swimmer? {
-        val swimmerRequest = SwimmerRequest(name = swimmer.name, age = swimmer.age, team = swimmer.team)
-        return handleResponse(apiService.updateSwimmer(id, swimmerRequest), "Updated swimmer", "Swimmer", "update", id)
+    suspend fun getPublicMenus(query: String?, tags: String?, page: Int?, limit: Int?): List<PracticeMenu>? {
+        return handleResponse({ apiService.getPublicMenus(query, tags, page, limit) }, "Fetched public menus", "getPublicMenus")
     }
 
-    suspend fun deleteSwimmer(id: Int): Boolean {
-        return handleDeleteResponse(apiService.deleteSwimmer(id), "Swimmer", id)
+    suspend fun getMenuById(menuId: UUID): PracticeMenu? {
+        return handleResponse({ apiService.getMenuById(menuId) }, "Fetched menu by ID", "getMenuById")
     }
 
-    // --- Race ---
-    suspend fun getAllRaces(): List<Race> {
-        return handleListResponse(apiService.getAllRaces(), "races")
+    suspend fun updateMenu(menuId: UUID, practiceMenu: PracticeMenu): PracticeMenu? {
+        return handleResponse({ apiService.updateMenu(menuId, practiceMenu) }, "Updated menu", "updateMenu")
     }
 
-    suspend fun getRace(id: Int): Race? {
-        return handleResponse(apiService.getRace(id), "Fetched race", "Race", "get", id)
+    suspend fun deleteMenu(menuId: UUID): Boolean {
+        return handleResponse({ apiService.deleteMenu(menuId) }, "Deleted menu", "deleteMenu") != null
     }
 
-    suspend fun createRace(race: Race): Race? {
-        return handleResponse(apiService.createRace(race), "Created race", "Race", "create")
+    suspend fun forkMenu(publicMenuId: UUID): PracticeMenu? {
+        return handleResponse({ apiService.forkMenu(publicMenuId) }, "Forked menu", "forkMenu")
     }
 
-    suspend fun updateRace(id: Int, race: Race): Race? {
-        // Note: ApiService.updateRace expects Race. If it changes to RaceRequest, conversion will be needed here.
-        return handleResponse(apiService.updateRace(id, race), "Updated race", "Race", "update", id)
+    suspend fun checkUpdate(menuId: UUID): Map<String, Boolean>? {
+        return handleResponse({ apiService.checkUpdate(menuId) }, "Checked for menu update", "checkUpdate")
     }
 
-    suspend fun deleteRace(id: Int): Boolean {
-        return handleDeleteResponse(apiService.deleteRace(id), "Race", id)
+    suspend fun pullUpdate(menuId: UUID): PracticeMenu? {
+        return handleResponse({ apiService.pullUpdate(menuId) }, "Pulled menu update", "pullUpdate")
     }
 
-    // --- Result ---
-    suspend fun getAllResults(): List<Result> {
-        return handleListResponse(apiService.getAllResults(), "results")
+    // --- Comment ---
+    suspend fun postComment(menuId: UUID, comment: Map<String, String>): Comment? {
+        return handleResponse({ apiService.postComment(menuId, comment) }, "Posted comment", "postComment")
     }
 
-    suspend fun getResult(id: Int): Result? {
-        return handleResponse(apiService.getResult(id), "Fetched result", "Result", "get", id)
+    suspend fun getComments(menuId: UUID): List<Comment>? {
+        return handleResponse({ apiService.getComments(menuId) }, "Fetched comments", "getComments")
     }
 
-    suspend fun createResult(result: Result): Result? {
-        return handleResponse(apiService.createResult(result), "Created result", "Result", "create")
+    suspend fun deleteComment(commentId: UUID): Boolean {
+        return handleResponse({ apiService.deleteComment(commentId) }, "Deleted comment", "deleteComment") != null
     }
 
-    suspend fun updateResult(id: Int, result: Result): Result? {
-        // Note: ApiService.updateResult expects Result. If it changes to ResultRequest, conversion will be needed here.
-        return handleResponse(apiService.updateResult(id, result), "Updated result", "Result", "update", id)
+    // --- Favorite ---
+    suspend fun addFavorite(publicMenuId: UUID): Favorite? {
+        return handleResponse({ apiService.addFavorite(publicMenuId) }, "Added favorite", "addFavorite")
     }
 
-    suspend fun deleteResult(id: Int): Boolean {
-        return handleDeleteResponse(apiService.deleteResult(id), "Result", id)
+    suspend fun removeFavorite(publicMenuId: UUID): Boolean {
+        return handleResponse({ apiService.removeFavorite(publicMenuId) }, "Removed favorite", "removeFavorite") != null
+    }
+
+    suspend fun getFavorites(): List<Favorite>? {
+        return handleResponse({ apiService.getFavorites() }, "Fetched favorites", "getFavorites")
     }
 }
 

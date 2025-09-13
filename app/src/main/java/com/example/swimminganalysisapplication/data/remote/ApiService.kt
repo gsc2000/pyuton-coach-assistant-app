@@ -1,62 +1,76 @@
 package com.example.swimminganalysisapplication.data.remote
 
-import com.example.swimminganalysisapplication.data.remote.model.Race
-import com.example.swimminganalysisapplication.data.remote.model.Result
-import com.example.swimminganalysisapplication.data.remote.model.Swimmer
-import com.example.swimminganalysisapplication.data.remote.model.SwimmerRequest // ★ 追加
+import com.example.swimminganalysisapplication.data.remote.model.Comment
+import com.example.swimminganalysisapplication.data.remote.model.Favorite
+import com.example.swimminganalysisapplication.data.remote.model.PracticeMenu
+import com.example.swimminganalysisapplication.data.remote.model.User
 import retrofit2.Response
-import retrofit2.http.* // Body, POSTなども使えるようにワイルドカードに変更
+import retrofit2.http.*
+import java.util.UUID
 
-interface ApiService { // ★ インターフェース名を ApiService に統一
+interface ApiService {
 
-    // --- Swimmer Endpoints ---
-    @GET("api/swimmers")
-    suspend fun getAllSwimmers(): Response<List<Swimmer>>
+    // 2.1 認証 (/auth)
+    @POST("auth/register")
+    suspend fun register(@Body user: Map<String, String>): Response<User>
 
-    @GET("api/swimmers/{id}")
-    suspend fun getSwimmer(@Path("id") id: Int): Response<Swimmer>
+    @POST("auth/login")
+    suspend fun login(@Body credentials: Map<String, String>): Response<Map<String, String>> // e.g., {"token": "..."}
 
-    // @POST("api/swimmers") // ★ 古い定義はコメントアウト
-    // suspend fun createSwimmer(@Body swimmer: Swimmer): Response<Swimmer>
+    @GET("auth/me")
+    suspend fun getMe(): Response<User>
 
-    @POST("api/swimmers") // ★ 新しい定義
-    suspend fun createSwimmer(@Body swimmer: SwimmerRequest): Response<Swimmer>
+    // 2.2 練習メニュー (/menus)
+    @POST("menus")
+    suspend fun createMenu(@Body practiceMenu: PracticeMenu): Response<PracticeMenu>
 
-    @PUT("api/swimmers/{id}")
-    suspend fun updateSwimmer(@Path("id") id: Int, @Body swimmer: SwimmerRequest): Response<Swimmer> // ★ BodyをSwimmerRequestに変更
+    @GET("menus")
+    suspend fun getMyMenus(): Response<List<PracticeMenu>>
 
-    @DELETE("api/swimmers/{id}")
-    suspend fun deleteSwimmer(@Path("id") id: Int): Response<Unit>
+    @GET("menus/public")
+    suspend fun getPublicMenus(
+        @Query("search") query: String?,
+        @Query("tags") tags: String?, // Comma-separated
+        @Query("page") page: Int?,
+        @Query("limit") limit: Int?
+    ): Response<List<PracticeMenu>>
 
-    // --- Race Endpoints ---
-    @GET("api/races")
-    suspend fun getAllRaces(): Response<List<Race>>
+    @GET("menus/{menu_id}")
+    suspend fun getMenuById(@Path("menu_id") menuId: UUID): Response<PracticeMenu>
 
-    @GET("api/races/{id}")
-    suspend fun getRace(@Path("id") id: Int): Response<Race>
+    @PUT("menus/{menu_id}")
+    suspend fun updateMenu(@Path("menu_id") menuId: UUID, @Body practiceMenu: PracticeMenu): Response<PracticeMenu>
 
-    @POST("api/races")
-    suspend fun createRace(@Body race: Race): Response<Race> // TODO: RaceRequestを作るか検討
+    @DELETE("menus/{menu_id}")
+    suspend fun deleteMenu(@Path("menu_id") menuId: UUID): Response<Unit>
 
-    @PUT("api/races/{id}")
-    suspend fun updateRace(@Path("id") id: Int, @Body race: Race): Response<Race> // TODO: RaceRequestを作るか検討
+    @POST("menus/{public_menu_id}/fork")
+    suspend fun forkMenu(@Path("public_menu_id") publicMenuId: UUID): Response<PracticeMenu>
 
-    @DELETE("api/races/{id}")
-    suspend fun deleteRace(@Path("id") id: Int): Response<Unit>
+    @GET("menus/{menu_id}/check_update")
+    suspend fun checkUpdate(@Path("menu_id") menuId: UUID): Response<Map<String, Boolean>> // e.g., {"has_update": true}
 
-    // --- Result Endpoints ---
-    @GET("api/results")
-    suspend fun getAllResults(): Response<List<Result>>
+    @POST("menus/{menu_id}/pull_update")
+    suspend fun pullUpdate(@Path("menu_id") menuId: UUID): Response<PracticeMenu>
 
-    @GET("api/results/{id}")
-    suspend fun getResult(@Path("id") id: Int): Response<Result>
+    // 2.3 コメント (/menus/{menu_id}/comments)
+    @POST("menus/{menu_id}/comments")
+    suspend fun postComment(@Path("menu_id") menuId: UUID, @Body comment: Map<String, String>): Response<Comment>
 
-    @POST("api/results")
-    suspend fun createResult(@Body result: Result): Response<Result> // TODO: ResultRequestを作るか検討
+    @GET("menus/{menu_id}/comments")
+    suspend fun getComments(@Path("menu_id") menuId: UUID): Response<List<Comment>>
 
-    @PUT("api/results/{id}")
-    suspend fun updateResult(@Path("id") id: Int, @Body result: Result): Response<Result> // TODO: ResultRequestを作るか検討
+    @DELETE("comments/{comment_id}")
+    suspend fun deleteComment(@Path("comment_id") commentId: UUID): Response<Unit>
 
-    @DELETE("api/results/{id}")
-    suspend fun deleteResult(@Path("id") id: Int): Response<Unit>
+    // 2.4 お気に入り (/users/me/favorites)
+    @POST("users/me/favorites/{public_menu_id}")
+    suspend fun addFavorite(@Path("public_menu_id") publicMenuId: UUID): Response<Favorite>
+
+    @DELETE("users/me/favorites/{public_menu_id}")
+    suspend fun removeFavorite(@Path("public_menu_id") publicMenuId: UUID): Response<Unit>
+
+    @GET("users/me/favorites")
+    suspend fun getFavorites(): Response<List<Favorite>>
 }
+

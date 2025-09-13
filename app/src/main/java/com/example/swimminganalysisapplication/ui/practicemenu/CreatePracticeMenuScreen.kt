@@ -1,6 +1,7 @@
 package com.example.swimminganalysisapplication.ui.practicemenu
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
@@ -23,10 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
@@ -96,31 +99,47 @@ const val CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX = "CreatePracticeMenuDragOffs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: String?) {
+fun CreatePracticeMenuScreen(
+    navController: NavController,
+    practiceMenuId: String?,
+    viewModel: CreatePracticeMenuViewModel
+) {
     var menuTitle by rememberSaveable { mutableStateOf("") }
     var menuDescription by rememberSaveable { mutableStateOf("") }
     val practiceMenuItems = remember { mutableStateListOf<PracticeMenuItem>() }
 
     val isEditing = practiceMenuId != null
     val screenTitle = if (isEditing) "練習メニュー編集" else "練習メニュー作成"
-    var initialLoadDone by remember { mutableStateOf(!isEditing) }
 
-    LaunchedEffect(practiceMenuId, initialLoadDone) {
-        if (isEditing && !initialLoadDone) {
-            Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "Editing menu with ID: $practiceMenuId. Attempting to load data.")
-            // TODO: practiceMenuId を使って実際のメニューデータをロードする
-            if (practiceMenuId == "dummy_id_1") {
-                menuTitle = "編集中のメニュータイトル1"
-                menuDescription = "編集中のメニュー説明1"
-                practiceMenuItems.clear()
-                practiceMenuItems.add(PracticeMenuItem(drillName = "編集項目1", distance = "100m"))
-            } else if (practiceMenuId.isNotBlank()) {
-                menuTitle = "取得したタイトル ($practiceMenuId)"
-                menuDescription = "取得した説明"
-                practiceMenuItems.clear()
-                practiceMenuItems.add(PracticeMenuItem(drillName = "取得した項目1", distance = "50m"))
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(key1 = practiceMenuId) {
+        if (practiceMenuId != null) {
+            viewModel.loadMenu(UUID.fromString(practiceMenuId))
+        }
+    }
+
+    LaunchedEffect(key1 = viewModel.practiceMenu) {
+        viewModel.practiceMenu.value?.let { menu ->
+            menuTitle = menu.title
+            val (desc, items) = viewModel.getItemsFromJson(menu.description)
+            menuDescription = desc
+            practiceMenuItems.clear()
+            practiceMenuItems.addAll(items)
+        }
+    }
+
+    LaunchedEffect(uiState) {
+        when (val state = uiState) {
+            is UiState.Success -> {
+                Toast.makeText(context, "保存しました", Toast.LENGTH_SHORT).show()
+                navController.popBackStack()
             }
-            initialLoadDone = true
+            is UiState.Error -> {
+                Toast.makeText(context, "エラー: ${state.message}", Toast.LENGTH_LONG).show()
+            }
+            else -> {}
         }
     }
 
@@ -168,28 +187,25 @@ fun CreatePracticeMenuScreen(navController: NavController, practiceMenuId: Strin
                 title = { Text(screenTitle) },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
                 actions = {
-                    Button(onClick = {
-                        val currentMenuId = practiceMenuId ?: UUID.randomUUID().toString()
-                        val menuToLog = PracticeMenu(id = currentMenuId, title = menuTitle, description = menuDescription, items = practiceMenuItems)
-                        Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "Save: ${menuToLog.toString()}")
-                        // TODO: Actually save the menu
-
-                        navController.previousBackStackEntry
-                            ?.savedStateHandle?.apply {
-                                set("newPracticeMenuAdded", true)
-                                set("newMenuTitle", menuTitle.ifBlank { "無題のメニュー" })
-                                set("updatedMenuId", currentMenuId)
-                            }
-                        if (navController.previousBackStackEntry?.destination?.route?.startsWith(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) == true ||
-                            navController.graph.findNode(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) != null ) {
-                            navController.popBackStack(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE, inclusive = false)
+                    Button(
+                        onClick = {
+                            viewModel.saveMenu(
+                                title = menuTitle,
+                                description = menuDescription,
+                                items = practiceMenuItems.toList(),
+                                isPublic = false, // TODO: Add UI for this
+                                tags = emptyList(), // TODO: Add UI for this
+                                existingMenuId = practiceMenuId?.let { UUID.fromString(it) }
+                            )
+                        },
+                        enabled = uiState != UiState.Loading
+                    ) {
+                        if (uiState == UiState.Loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
                         } else {
-                            navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
-                                popUpTo(AppDestinations.HOME_SCREEN_ROUTE)
-                                launchSingleTop = true
-                            }
+                            Text("保存")
                         }
-                    }) { Text("保存") }
+                    }
                     AccountActionsMenu(navController = navController)
                 },
                 colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を追加

@@ -19,20 +19,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.RetrofitClient
 import com.example.swimminganalysisapplication.navigation.AppDestinations
-import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerScreen
-import com.example.swimminganalysisapplication.ui.addswimmer.AddSwimmerViewModelFactory
 import com.example.swimminganalysisapplication.ui.home.HomeScreen
 import com.example.swimminganalysisapplication.ui.login.CreateAccountScreen // New import
 import com.example.swimminganalysisapplication.ui.login.LoginScreen // New import
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuViewModelFactory
 import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.DiscoverScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.FavoritesScreen
-import com.example.swimminganalysisapplication.ui.swimmers.SwimmersScreen
-import com.example.swimminganalysisapplication.ui.swimmers.SwimmersViewModelFactory
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
 import com.example.swimminganalysisapplication.ui.video.StartPositionSettingScreen
 import com.example.swimminganalysisapplication.ui.video.VideoScreen
@@ -41,8 +39,7 @@ import com.example.swimminganalysisapplication.ui.menucomments.MenuCommentsScree
 class MainActivity : ComponentActivity() {
 
     private val swimmingRepository by lazy { SwimmingRepository(RetrofitClient.instance) }
-    private val swimmersViewModelFactory by lazy { SwimmersViewModelFactory(swimmingRepository) }
-    private val addSwimmerViewModelFactory by lazy { AddSwimmerViewModelFactory(swimmingRepository) }
+    private val createPracticeMenuViewModelFactory by lazy { CreatePracticeMenuViewModelFactory(swimmingRepository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -81,18 +78,6 @@ class MainActivity : ComponentActivity() {
                         composable(AppDestinations.VIDEO_SCREEN_ROUTE) {
                             VideoScreen(navController = navController)
                         }
-                        composable(AppDestinations.SWIMMERS_SCREEN_ROUTE) {
-                            SwimmersScreen(
-                                navController = navController,
-                                factory = swimmersViewModelFactory
-                            )
-                        }
-                        composable(AppDestinations.ADD_SWIMMER_ROUTE) {
-                            AddSwimmerScreen(
-                                navController = navController,
-                                factory = addSwimmerViewModelFactory
-                            )
-                        }
                         composable(
                             route = "${AppDestinations.START_POSITION_SETTING_ROUTE}/{video1UriString}/{video2UriString}/{initialStart1Ms}/{initialStart2Ms}/{duration1Ms}/{duration2Ms}",
                             arguments = listOf(
@@ -130,7 +115,11 @@ class MainActivity : ComponentActivity() {
                             arguments = listOf(navArgument("menuId") { type = NavType.StringType; nullable = true })
                         ) { backStackEntry ->
                             val menuId = backStackEntry.arguments?.getString("menuId")
-                            CreatePracticeMenuScreen(navController = navController, practiceMenuId = menuId)
+                            CreatePracticeMenuScreen(
+                                navController = navController,
+                                practiceMenuId = menuId,
+                                viewModel = viewModel(factory = createPracticeMenuViewModelFactory)
+                            )
                         }
                         composable(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
                             PracticeListScreen(navController = navController)
