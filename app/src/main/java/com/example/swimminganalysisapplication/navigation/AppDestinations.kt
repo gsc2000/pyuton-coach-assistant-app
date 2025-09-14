@@ -14,5 +14,8 @@ object AppDestinations {
     const val MENU_COMMENTS_WITH_ARG_ROUTE = "menu_comments/{menuId}" // menuIdを引数として取る
     const val DISCOVER_SCREEN_ROUTE = "discover_menus"
     const val FAVORITES_SCREEN_ROUTE = "favorites_screen"
+    const val PLAYER_LIST_SCREEN_ROUTE = "player_list_screen"
+    const val PLAYER_EDIT_SCREEN_ROUTE = "player_edit_screen"
+    const val ANALYSIS_LIST_SCREEN_ROUTE = "analysis_list_screen"
 }
 

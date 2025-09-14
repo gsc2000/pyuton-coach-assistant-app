@@ -2,16 +2,13 @@ package com.example.swimminganalysisapplication.data
 
 import android.util.Log
 import com.example.swimminganalysisapplication.data.remote.ApiService
-import com.example.swimminganalysisapplication.data.remote.model.Comment
-import com.example.swimminganalysisapplication.data.remote.model.Favorite
-import com.example.swimminganalysisapplication.data.remote.model.PracticeMenu
-import com.example.swimminganalysisapplication.data.remote.model.User
-import java.util.UUID
+import com.example.swimminganalysisapplication.data.remote.model.*
+import retrofit2.Response
 
 class SwimmingRepository(private val apiService: ApiService) {
 
     private suspend fun <T> handleResponse(
-        apiCall: suspend () -> retrofit2.Response<T>,
+        apiCall: suspend () -> Response<T>,
         successMessage: String,
         operation: String
     ): T? {
@@ -31,82 +28,73 @@ class SwimmingRepository(private val apiService: ApiService) {
         }
     }
 
+    // --- User ---
+    suspend fun createUser(user: User): User? = handleResponse({ apiService.createUser(user) }, "Created user", "createUser")
+    suspend fun getUser(id: Int): User? = handleResponse({ apiService.getUser(id) }, "Fetched user", "getUser")
+    suspend fun login(credentials: Map<String, String>): Response<Token> = apiService.login(credentials)
+    suspend fun getMe(): User? = handleResponse({ apiService.getMe() }, "Fetched self user", "getMe")
 
-    // --- Auth ---
-    suspend fun register(user: Map<String, String>): User? {
-        return handleResponse({ apiService.register(user) }, "User registered", "register")
-    }
 
-    suspend fun login(credentials: Map<String, String>): Map<String, String>? {
-        return handleResponse({ apiService.login(credentials) }, "User logged in", "login")
-    }
+    // --- Player ---
+    suspend fun createPlayer(player: Player): Player? = handleResponse({ apiService.createPlayer(player) }, "Created player", "createPlayer")
+    suspend fun getPlayers(): List<Player>? = handleResponse({ apiService.getPlayers() }, "Fetched players", "getPlayers")
+    suspend fun getPlayer(id: Int): Player? = handleResponse({ apiService.getPlayer(id) }, "Fetched player", "getPlayer")
+    suspend fun updatePlayer(id: Int, player: Player): Player? = handleResponse({ apiService.updatePlayer(id, player) }, "Updated player", "updatePlayer")
+    suspend fun deletePlayer(id: Int): Boolean = handleResponse({ apiService.deletePlayer(id) }, "Deleted player", "deletePlayer") != null
 
-    suspend fun getMe(): User? {
-        return handleResponse({ apiService.getMe() }, "Fetched user profile", "getMe")
-    }
+    // --- Menu ---
+    suspend fun createMenu(menu: Menu): Menu? = handleResponse({ apiService.createMenu(menu) }, "Created menu", "createMenu")
+    suspend fun getMenus(): List<Menu>? = handleResponse({ apiService.getMenus() }, "Fetched menus", "getMenus")
+    suspend fun getMenu(id: Int): Menu? = handleResponse({ apiService.getMenu(id) }, "Fetched menu", "getMenu")
+    suspend fun updateMenu(id: Int, menu: Menu): Menu? = handleResponse({ apiService.updateMenu(id, menu) }, "Updated menu", "updateMenu")
+    suspend fun deleteMenu(id: Int): Boolean = handleResponse({ apiService.deleteMenu(id) }, "Deleted menu", "deleteMenu") != null
 
-    // --- PracticeMenu ---
-    suspend fun createMenu(practiceMenu: PracticeMenu): PracticeMenu? {
-        return handleResponse({ apiService.createMenu(practiceMenu) }, "Created menu", "createMenu")
-    }
+    // --- Tag ---
+    suspend fun createTag(tag: ApiTag): ApiTag? = handleResponse({ apiService.createTag(tag) }, "Created tag", "createTag")
+    suspend fun getTags(): List<ApiTag>? = handleResponse({ apiService.getTags() }, "Fetched tags", "getTags")
 
-    suspend fun getMyMenus(): List<PracticeMenu>? {
-        return handleResponse({ apiService.getMyMenus() }, "Fetched my menus", "getMyMenus")
-    }
+    // --- MenuTagRelation ---
+    suspend fun createMenuTagRelation(relation: MenuTagRelation): MenuTagRelation? = handleResponse({ apiService.createMenuTagRelation(relation) }, "Created menu tag relation", "createMenuTagRelation")
 
-    suspend fun getPublicMenus(query: String?, tags: String?, page: Int?, limit: Int?): List<PracticeMenu>? {
-        return handleResponse({ apiService.getPublicMenus(query, tags, page, limit) }, "Fetched public menus", "getPublicMenus")
-    }
-
-    suspend fun getMenuById(menuId: UUID): PracticeMenu? {
-        return handleResponse({ apiService.getMenuById(menuId) }, "Fetched menu by ID", "getMenuById")
-    }
-
-    suspend fun updateMenu(menuId: UUID, practiceMenu: PracticeMenu): PracticeMenu? {
-        return handleResponse({ apiService.updateMenu(menuId, practiceMenu) }, "Updated menu", "updateMenu")
-    }
-
-    suspend fun deleteMenu(menuId: UUID): Boolean {
-        return handleResponse({ apiService.deleteMenu(menuId) }, "Deleted menu", "deleteMenu") != null
-    }
-
-    suspend fun forkMenu(publicMenuId: UUID): PracticeMenu? {
-        return handleResponse({ apiService.forkMenu(publicMenuId) }, "Forked menu", "forkMenu")
-    }
-
-    suspend fun checkUpdate(menuId: UUID): Map<String, Boolean>? {
-        return handleResponse({ apiService.checkUpdate(menuId) }, "Checked for menu update", "checkUpdate")
-    }
-
-    suspend fun pullUpdate(menuId: UUID): PracticeMenu? {
-        return handleResponse({ apiService.pullUpdate(menuId) }, "Pulled menu update", "pullUpdate")
-    }
-
-    // --- Comment ---
-    suspend fun postComment(menuId: UUID, comment: Map<String, String>): Comment? {
-        return handleResponse({ apiService.postComment(menuId, comment) }, "Posted comment", "postComment")
-    }
-
-    suspend fun getComments(menuId: UUID): List<Comment>? {
-        return handleResponse({ apiService.getComments(menuId) }, "Fetched comments", "getComments")
-    }
-
-    suspend fun deleteComment(commentId: UUID): Boolean {
-        return handleResponse({ apiService.deleteComment(commentId) }, "Deleted comment", "deleteComment") != null
-    }
+    // --- Chat ---
+    suspend fun createChat(chat: Chat): Chat? = handleResponse({ apiService.createChat(chat) }, "Created chat", "createChat")
+    suspend fun getChats(): List<Chat>? = handleResponse({ apiService.getChats() }, "Fetched chats", "getChats")
 
     // --- Favorite ---
-    suspend fun addFavorite(publicMenuId: UUID): Favorite? {
-        return handleResponse({ apiService.addFavorite(publicMenuId) }, "Added favorite", "addFavorite")
+    suspend fun createFavorite(favorite: Favorite): Favorite? = handleResponse({ apiService.createFavorite(favorite) }, "Created favorite", "createFavorite")
+    suspend fun getFavorites(): List<Favorite>? = handleResponse({ apiService.getFavorites() }, "Fetched favorites", "getFavorites")
+
+    // --- ChatThread ---
+    suspend fun createChatThread(chatThread: ChatThread): ChatThread? = handleResponse({ apiService.createChatThread(chatThread) }, "Created chat thread", "createChatThread")
+    suspend fun getChatThreads(): List<ChatThread>? = handleResponse({ apiService.getChatThreads() }, "Fetched chat threads", "getChatThreads")
+
+    // --- Video ---
+    suspend fun createVideo(video: Video): Video? = handleResponse({ apiService.createVideo(video) }, "Created video", "createVideo")
+    suspend fun getVideos(): List<Video>? = handleResponse({ apiService.getVideos() }, "Fetched videos", "getVideos")
+
+    // --- Analysis ---
+    suspend fun createAnalysis(analysis: Analysis): Analysis? = handleResponse({ apiService.createAnalysis(analysis) }, "Created analysis", "createAnalysis")
+    suspend fun getAnalyses(): List<Analysis>? = handleResponse({ apiService.getAnalyses() }, "Fetched analyses", "getAnalyses")
+    suspend fun getAnalysisJson(url: String): String? {
+        return try {
+            val response = apiService.getAnalysisJson(url)
+            if (response.isSuccessful) {
+                Log.i("SwimmingRepository", "Fetched analysis JSON successfully.")
+                response.body()?.string()
+            } else {
+                val errorMsg = "Failed to fetch analysis JSON: ${response.code()} ${response.message()}"
+                Log.e("SwimmingRepository", errorMsg)
+                throw ApiException("分析JSONの取得に失敗しました: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            Log.e("SwimmingRepository", "Exception during getAnalysisJson: ${e.message}", e)
+            throw ApiException("分析JSONの取得中に例外が発生しました: ${e.message}")
+        }
     }
 
-    suspend fun removeFavorite(publicMenuId: UUID): Boolean {
-        return handleResponse({ apiService.removeFavorite(publicMenuId) }, "Removed favorite", "removeFavorite") != null
-    }
-
-    suspend fun getFavorites(): List<Favorite>? {
-        return handleResponse({ apiService.getFavorites() }, "Fetched favorites", "getFavorites")
-    }
+    // --- Attachment ---
+    suspend fun createAttachment(attachment: Attachment): Attachment? = handleResponse({ apiService.createAttachment(attachment) }, "Created attachment", "createAttachment")
+    suspend fun getAttachments(): List<Attachment>? = handleResponse({ apiService.getAttachments() }, "Fetched attachments", "getAttachments")
 }
 
 class ApiException(message: String) : Exception(message)

@@ -4,42 +4,47 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.RetrofitClient
+import com.example.swimminganalysisapplication.data.storage.UserPreferences
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.analysis.AnalysisListScreen
 import com.example.swimminganalysisapplication.ui.home.HomeScreen
-import com.example.swimminganalysisapplication.ui.login.CreateAccountScreen // New import
-import com.example.swimminganalysisapplication.ui.login.LoginScreen // New import
+import com.example.swimminganalysisapplication.ui.login.CreateAccountScreen
+import com.example.swimminganalysisapplication.ui.login.LoginScreen
+import com.example.swimminganalysisapplication.ui.login.LoginViewModelFactory
+import com.example.swimminganalysisapplication.ui.menucomments.MenuCommentsScreen
+import com.example.swimminganalysisapplication.ui.player.PlayerEditScreen
+import com.example.swimminganalysisapplication.ui.player.PlayerListScreen
+import com.example.swimminganalysisapplication.ui.player.PlayerViewModelFactory
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuViewModelFactory
-import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.DiscoverScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.FavoritesScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
 import com.example.swimminganalysisapplication.ui.video.StartPositionSettingScreen
 import com.example.swimminganalysisapplication.ui.video.VideoScreen
-import com.example.swimminganalysisapplication.ui.menucomments.MenuCommentsScreen
 
 class MainActivity : ComponentActivity() {
 
-    private val swimmingRepository by lazy { SwimmingRepository(RetrofitClient.instance) }
+    private val swimmingRepository by lazy { SwimmingRepository(RetrofitClient.getInstance(applicationContext)) }
+    private val userPreferences: UserPreferences by lazy { UserPreferences(applicationContext) }
     private val createPracticeMenuViewModelFactory by lazy { CreatePracticeMenuViewModelFactory(swimmingRepository) }
+    private val loginViewModelFactory: LoginViewModelFactory by lazy { LoginViewModelFactory(swimmingRepository, userPreferences) }
+    private val playerViewModelFactory: PlayerViewModelFactory by lazy { PlayerViewModelFactory(swimmingRepository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -62,12 +67,13 @@ class MainActivity : ComponentActivity() {
                             arguments = listOf(navArgument("menuId") { type = NavType.StringType; nullable = true })
                         ) { backStackEntry ->
                             val menuId = backStackEntry.arguments?.getString("menuId")
-                            // practiceMenusリストの参照をMenuCommentsScreenに渡すか、
-                            // またはMenuCommentsScreen内のRepositoryに事前に設定しておく必要がある
                             MenuCommentsScreen(navController = navController, menuId = menuId)
                         }
                         composable(AppDestinations.LOGIN_SCREEN_ROUTE) { // New route
-                            LoginScreen(navController = navController)
+                            LoginScreen(
+                                navController = navController,
+                                viewModel = viewModel(factory = loginViewModelFactory)
+                            )
                         }
                         composable(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE) { // New route
                             CreateAccountScreen(navController = navController)
@@ -126,6 +132,49 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(AppDestinations.FAVORITES_SCREEN_ROUTE) { // ★ これが追加されていることを確認
                             FavoritesScreen(navController = navController)
+                        }
+                        composable(AppDestinations.PLAYER_LIST_SCREEN_ROUTE) {
+                            PlayerListScreen(
+                                navController = navController,
+                                viewModel = viewModel(factory = playerViewModelFactory)
+                            )
+                        }
+
+                        composable(
+                            route = "${AppDestinations.PLAYER_EDIT_SCREEN_ROUTE}/{playerId}",
+                            arguments = listOf(navArgument("playerId") { type = NavType.StringType; nullable = true })
+                        ) { backStackEntry ->
+                            PlayerEditScreen(
+                                navController = navController,
+                                viewModel = viewModel(factory = playerViewModelFactory),
+                                playerId = backStackEntry.arguments?.getString("playerId")
+                            )
+                        }
+                        composable(AppDestinations.PLAYER_EDIT_SCREEN_ROUTE) {
+                            PlayerEditScreen(
+                                navController = navController,
+                                viewModel = viewModel(factory = playerViewModelFactory),
+                                playerId = null
+                            )
+                        }
+                        composable(
+                            route = AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE + "?playerId={playerId}&playerName={playerName}",
+                            arguments = listOf(
+                                navArgument("playerId") {
+                                    type = NavType.IntType
+                                    defaultValue = -1
+                                },
+                                navArgument("playerName") {
+                                    type = NavType.StringType
+                                    nullable = true
+                                }
+                            )
+                        ) { backStackEntry ->
+                            AnalysisListScreen(
+                                navController = navController,
+                                playerId = backStackEntry.arguments?.getInt("playerId") ?: -1,
+                                playerName = backStackEntry.arguments?.getString("playerName")
+                            )
                         }
                     }
                 }

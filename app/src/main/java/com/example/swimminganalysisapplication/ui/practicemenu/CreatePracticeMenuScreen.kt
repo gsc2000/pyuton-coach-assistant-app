@@ -37,7 +37,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 // --- PracticeMenuItemRow Composable (変更なし) ---
 @Composable
@@ -80,19 +79,12 @@ fun PracticeMenuItemRow(
 
 // --- Data classes (変更なし) ---
 data class PracticeMenuItem(
-    val id: String = UUID.randomUUID().toString(),
+    val id: String = java.util.UUID.randomUUID().toString(),
     var drillName: String = "",
     var distance: String = "",
     var repetitions: String = "",
     var rest: String = "",
     var notes: String = ""
-)
-
-data class PracticeMenu(
-    val id: String = UUID.randomUUID().toString(),
-    var title: String = "",
-    var description: String = "",
-    val items: SnapshotStateList<PracticeMenuItem> = mutableStateListOf()
 )
 
 const val CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX = "CreatePracticeMenuDragOffsetFix"
@@ -116,14 +108,16 @@ fun CreatePracticeMenuScreen(
 
     LaunchedEffect(key1 = practiceMenuId) {
         if (practiceMenuId != null) {
-            viewModel.loadMenu(UUID.fromString(practiceMenuId))
+            practiceMenuId.toIntOrNull()?.let {
+                viewModel.loadMenu(it)
+            }
         }
     }
 
     LaunchedEffect(key1 = viewModel.practiceMenu) {
         viewModel.practiceMenu.value?.let { menu ->
-            menuTitle = menu.title
-            val (desc, items) = viewModel.getItemsFromJson(menu.description)
+            menuTitle = menu.menuTitle
+            val (desc, items) = viewModel.getItemsFromJson(menu.menuDescription)
             menuDescription = desc
             practiceMenuItems.clear()
             practiceMenuItems.addAll(items)
@@ -195,7 +189,7 @@ fun CreatePracticeMenuScreen(
                                 items = practiceMenuItems.toList(),
                                 isPublic = false, // TODO: Add UI for this
                                 tags = emptyList(), // TODO: Add UI for this
-                                existingMenuId = practiceMenuId?.let { UUID.fromString(it) }
+                                existingMenuId = practiceMenuId?.toIntOrNull()
                             )
                         },
                         enabled = uiState != UiState.Loading

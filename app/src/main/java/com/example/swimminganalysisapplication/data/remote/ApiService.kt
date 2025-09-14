@@ -1,76 +1,112 @@
 package com.example.swimminganalysisapplication.data.remote
 
-import com.example.swimminganalysisapplication.data.remote.model.Comment
-import com.example.swimminganalysisapplication.data.remote.model.Favorite
-import com.example.swimminganalysisapplication.data.remote.model.PracticeMenu
-import com.example.swimminganalysisapplication.data.remote.model.User
+import com.example.swimminganalysisapplication.data.remote.model.*
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
-import java.util.UUID
 
 interface ApiService {
 
-    // 2.1 認証 (/auth)
-    @POST("auth/register")
-    suspend fun register(@Body user: Map<String, String>): Response<User>
+    @GET
+    suspend fun getAnalysisJson(@Url url: String): Response<ResponseBody>
 
-    @POST("auth/login")
-    suspend fun login(@Body credentials: Map<String, String>): Response<Map<String, String>> // e.g., {"token": "..."}
+    // User endpoints
+    @POST("users/")
+    suspend fun createUser(@Body user: User): Response<User>
 
-    @GET("auth/me")
+    @GET("users/{id}")
+    suspend fun getUser(@Path("id") id: Int): Response<User>
+
+    @POST("token")
+    suspend fun login(@Body credentials: Map<String, String>): Response<Token>
+
+    @GET("users/me/")
     suspend fun getMe(): Response<User>
 
-    // 2.2 練習メニュー (/menus)
-    @POST("menus")
-    suspend fun createMenu(@Body practiceMenu: PracticeMenu): Response<PracticeMenu>
 
-    @GET("menus")
-    suspend fun getMyMenus(): Response<List<PracticeMenu>>
+    // Player endpoints
+    @POST("players/")
+    suspend fun createPlayer(@Body player: Player): Response<Player>
 
-    @GET("menus/public")
-    suspend fun getPublicMenus(
-        @Query("search") query: String?,
-        @Query("tags") tags: String?, // Comma-separated
-        @Query("page") page: Int?,
-        @Query("limit") limit: Int?
-    ): Response<List<PracticeMenu>>
+    @GET("players/")
+    suspend fun getPlayers(): Response<List<Player>>
 
-    @GET("menus/{menu_id}")
-    suspend fun getMenuById(@Path("menu_id") menuId: UUID): Response<PracticeMenu>
+    @GET("players/{id}")
+    suspend fun getPlayer(@Path("id") id: Int): Response<Player>
 
-    @PUT("menus/{menu_id}")
-    suspend fun updateMenu(@Path("menu_id") menuId: UUID, @Body practiceMenu: PracticeMenu): Response<PracticeMenu>
+    @PUT("players/{id}")
+    suspend fun updatePlayer(@Path("id") id: Int, @Body player: Player): Response<Player>
 
-    @DELETE("menus/{menu_id}")
-    suspend fun deleteMenu(@Path("menu_id") menuId: UUID): Response<Unit>
+    @DELETE("players/{id}")
+    suspend fun deletePlayer(@Path("id") id: Int): Response<Unit>
 
-    @POST("menus/{public_menu_id}/fork")
-    suspend fun forkMenu(@Path("public_menu_id") publicMenuId: UUID): Response<PracticeMenu>
+    // Menu endpoints
+    @POST("menus/")
+    suspend fun createMenu(@Body menu: Menu): Response<Menu>
 
-    @GET("menus/{menu_id}/check_update")
-    suspend fun checkUpdate(@Path("menu_id") menuId: UUID): Response<Map<String, Boolean>> // e.g., {"has_update": true}
+    @GET("menus/")
+    suspend fun getMenus(): Response<List<Menu>>
 
-    @POST("menus/{menu_id}/pull_update")
-    suspend fun pullUpdate(@Path("menu_id") menuId: UUID): Response<PracticeMenu>
+    @GET("menus/{id}")
+    suspend fun getMenu(@Path("id") id: Int): Response<Menu>
 
-    // 2.3 コメント (/menus/{menu_id}/comments)
-    @POST("menus/{menu_id}/comments")
-    suspend fun postComment(@Path("menu_id") menuId: UUID, @Body comment: Map<String, String>): Response<Comment>
+    @PUT("menus/{id}")
+    suspend fun updateMenu(@Path("id") id: Int, @Body menu: Menu): Response<Menu>
 
-    @GET("menus/{menu_id}/comments")
-    suspend fun getComments(@Path("menu_id") menuId: UUID): Response<List<Comment>>
+    @DELETE("menus/{id}")
+    suspend fun deleteMenu(@Path("id") id: Int): Response<Unit>
 
-    @DELETE("comments/{comment_id}")
-    suspend fun deleteComment(@Path("comment_id") commentId: UUID): Response<Unit>
+    // Tag endpoints
+    @POST("tags/")
+    suspend fun createTag(@Body tag: ApiTag): Response<ApiTag>
 
-    // 2.4 お気に入り (/users/me/favorites)
-    @POST("users/me/favorites/{public_menu_id}")
-    suspend fun addFavorite(@Path("public_menu_id") publicMenuId: UUID): Response<Favorite>
+    @GET("tags/")
+    suspend fun getTags(): Response<List<ApiTag>>
 
-    @DELETE("users/me/favorites/{public_menu_id}")
-    suspend fun removeFavorite(@Path("public_menu_id") publicMenuId: UUID): Response<Unit>
+    // MenuTagRelation endpoints
+    @POST("menu_tag_relations/")
+    suspend fun createMenuTagRelation(@Body relation: MenuTagRelation): Response<MenuTagRelation>
 
-    @GET("users/me/favorites")
+    // Chat endpoints
+    @POST("chats/")
+    suspend fun createChat(@Body chat: Chat): Response<Chat>
+
+    @GET("chats/")
+    suspend fun getChats(): Response<List<Chat>>
+
+    // Favorite endpoints
+    @POST("favorites/")
+    suspend fun createFavorite(@Body favorite: Favorite): Response<Favorite>
+
+    @GET("favorites/")
     suspend fun getFavorites(): Response<List<Favorite>>
+
+    // ChatThread endpoints
+    @POST("chat_threads/")
+    suspend fun createChatThread(@Body chatThread: ChatThread): Response<ChatThread>
+
+    @GET("chat_threads/")
+    suspend fun getChatThreads(): Response<List<ChatThread>>
+
+    // Video endpoints
+    @POST("videos/")
+    suspend fun createVideo(@Body video: Video): Response<Video>
+
+    @GET("videos/")
+    suspend fun getVideos(): Response<List<Video>>
+
+    // Analysis endpoints
+    @POST("analyses/")
+    suspend fun createAnalysis(@Body analysis: Analysis): Response<Analysis>
+
+    @GET("analyses/")
+    suspend fun getAnalyses(): Response<List<Analysis>>
+
+    // Attachment endpoints
+    @POST("attachments/")
+    suspend fun createAttachment(@Body attachment: Attachment): Response<Attachment>
+
+    @GET("attachments/")
+    suspend fun getAttachments(): Response<List<Attachment>>
 }
 

@@ -24,71 +24,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 
 private const val TAG_HOME = "HomeScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
-    var showMenu by remember { mutableStateOf(false) } // ドロップダウンメニューの表示状態を管理
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Pyuton Coach Assistant") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
-                    Box { // IconButtonとDropdownMenuを同じBox内に配置して位置を調整
-                        IconButton(onClick = { showMenu = true }) { // クリックでメニューを表示
-                            Icon(
-                                imageVector = Icons.Filled.AccountCircle,
-                                contentDescription = "アカウント情報"
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false } // メニュー外をタップで非表示
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("設定") },
-                                onClick = {
-                                    showMenu = false
-                                    Log.d(TAG_HOME, "Settings option clicked.")
-                                    // TODO: 設定画面への遷移を実装
-                                    // navController.navigate("settings_screen_route")
-                                },
-                                leadingIcon = { // アイコンを追加 (オプション)
-                                    Icon(
-                                        Icons.Filled.Settings,
-                                        contentDescription = "設定アイコン"
-                                    )
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("ログアウト") },
-                                onClick = {
-                                    showMenu = false
-                                    Log.d(TAG_HOME, "Logout option clicked.")
-                                    navController.navigate(AppDestinations.LOGIN_SCREEN_ROUTE) {
-                                        popUpTo(AppDestinations.HOME_SCREEN_ROUTE) {
-                                            inclusive = true // ホーム画面もスタックから消す
-                                        }
-                                        // または popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                        // launchSingleTop = true // LOGIN_SCREEN_ROUTEが既にスタックにあれば再利用
-                                    }
-                                },
-                                leadingIcon = { // アイコンを追加 (オプション)
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ExitToApp,
-                                        contentDescription = "ログアウトアイコン"
-                                    )
-                                }
-                            )
-                        }
-                    }
+                    AccountActionsMenu(navController = navController)
                 }
             )
         }
@@ -155,6 +108,12 @@ fun HomeScreen(navController: NavController) {
                 title = "練習メニュー",
                 icon = Icons.Filled.PostAdd,
                 onClick = { navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) }
+            )
+
+            HomeNavigationCard(
+                title = "選手管理",
+                icon = Icons.Filled.AccountCircle,
+                onClick = { navController.navigate(AppDestinations.PLAYER_LIST_SCREEN_ROUTE) }
             )
 
             Spacer(modifier = Modifier.weight(1f))

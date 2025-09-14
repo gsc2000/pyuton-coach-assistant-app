@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings // For Start Position Settings
@@ -518,6 +519,9 @@ fun VideoScreen(navController: NavController) {
                 title = { Text("動画比較 & 解析") },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
                 actions = {
+                    IconButton(onClick = { navController.navigate(AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE) }) {
+                        Icon(Icons.Filled.Assessment, "分析結果一覧")
+                    }
                     IconButton(onClick = {
                         val encodedUri1 = videoUri1?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
                         val encodedUri2 = videoUri2?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"

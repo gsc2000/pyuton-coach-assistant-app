@@ -3,29 +3,48 @@ package com.example.swimminganalysisapplication.ui.login
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
-import kotlinx.coroutines.launch // kotlinx.coroutines.launch をインポート
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(navController: NavController) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    val snackbarHostState = remember { SnackbarHostState() } // SnackbarHostState を宣言
-    val scope = rememberCoroutineScope() // CoroutineScope を宣言
+fun LoginScreen(navController: NavController, viewModel: LoginViewModel) {
+    val email by viewModel.email.collectAsState()
+    val password by viewModel.password.collectAsState()
+    val loginState by viewModel.loginState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(loginState) {
+        when (val state = loginState) {
+            is LoginState.Success -> {
+                navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
+                    popUpTo(AppDestinations.LOGIN_SCREEN_ROUTE) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+            is LoginState.Error -> {
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = state.message,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
+            else -> {}
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("ログイン") })
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) } // SnackbarHost を Scaffold に追加
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -40,7 +59,7 @@ fun LoginScreen(navController: NavController) {
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { viewModel.onEmailChange(it) },
                 label = { Text("メールアドレス") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -49,7 +68,7 @@ fun LoginScreen(navController: NavController) {
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { viewModel.onPasswordChange(it) },
                 label = { Text("パスワード") },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
@@ -58,23 +77,15 @@ fun LoginScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = {
-                    // TODO: Implement actual login logic
-                    // For now, navigate to HomeScreen after "login"
-                    // navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
-                    //    popUpTo(AppDestinations.LOGIN_SCREEN_ROUTE) { inclusive = true }
-                    //    launchSingleTop = true
-                    // }
-                    scope.launch { // CoroutineScope を使用して Snackbar を表示
-                        snackbarHostState.showSnackbar(
-                            message = "ログイン機能は実装中です。「登録せずに利用を開始する」を選択してください",
-                            duration = SnackbarDuration.Short
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
+                onClick = { viewModel.login() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = loginState != LoginState.Loading
             ) {
-                Text("ログイン")
+                if (loginState == LoginState.Loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Text("ログイン")
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
 

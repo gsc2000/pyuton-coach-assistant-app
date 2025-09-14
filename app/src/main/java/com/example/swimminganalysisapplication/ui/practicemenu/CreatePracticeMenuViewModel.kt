@@ -4,28 +4,27 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
-import com.example.swimminganalysisapplication.data.remote.model.PracticeMenu
+import com.example.swimminganalysisapplication.data.remote.model.Menu
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : ViewModel() {
 
-    private val _practiceMenu = MutableStateFlow<PracticeMenu?>(null)
-    val practiceMenu: StateFlow<PracticeMenu?> = _practiceMenu.asStateFlow()
+    private val _practiceMenu = MutableStateFlow<Menu?>(null)
+    val practiceMenu: StateFlow<Menu?> = _practiceMenu.asStateFlow()
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    fun loadMenu(menuId: UUID) {
+    fun loadMenu(menuId: Int) {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val menu = repository.getMenuById(menuId)
+                val menu = repository.getMenu(menuId)
                 _practiceMenu.value = menu
                 _uiState.value = UiState.Success
             } catch (e: Exception) {
@@ -34,7 +33,7 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
         }
     }
 
-    fun saveMenu(title: String, description: String, items: List<PracticeMenuItem>, isPublic: Boolean, tags: List<String>, existingMenuId: UUID?) {
+    fun saveMenu(title: String, description: String, items: List<PracticeMenuItem>, isPublic: Boolean, tags: List<String>, existingMenuId: Int?) {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
@@ -49,11 +48,11 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
 
                 if (existingMenuId != null) {
                     // Update existing menu
-                    val menuToUpdate = repository.getMenuById(existingMenuId)?.copy(
-                        title = title,
-                        description = fullDescription,
-                        is_public = isPublic,
-                        tags = tags
+                    val menuToUpdate = repository.getMenu(existingMenuId)?.copy(
+                        menuTitle = title,
+                        menuDescription = fullDescription,
+                        menuIsPublic = isPublic
+                        // tags are handled via MenuTagRelation
                     )
                     if (menuToUpdate != null) {
                         repository.updateMenu(existingMenuId, menuToUpdate)
@@ -62,18 +61,20 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                     }
                 } else {
                     // Create new menu
-                    val newMenu = PracticeMenu(
-                        id = UUID.randomUUID(),
-                        user_id = UUID.randomUUID(), // This should come from the logged-in user
-                        title = title,
-                        description = fullDescription,
-                        is_public = isPublic,
-                        tags = tags,
-                        version = 1,
-                        is_forked = false,
-                        forked_from_menu_id = null,
-                        created_at = "", // Server will set this
-                        updated_at = ""  // Server will set this
+                    val newMenu = Menu(
+                        menuId = 0, // Server will generate ID
+                        menuOrgId = 0, // TODO:
+                        menuTitle = title,
+                        menuDescription = fullDescription,
+                        menuIsPublic = isPublic,
+                        menuIsForked = false,
+                        menuForkedFromMenuId = null,
+                        menuVersion = 1,
+                        menuCreateAt = "", // Server will set this
+                        menuUpdateAt = "",  // Server will set this
+                        userId = 0, // This should come from the logged-in user
+                        playerId = null,
+                        menuTagId = null
                     )
                     repository.createMenu(newMenu)
                 }

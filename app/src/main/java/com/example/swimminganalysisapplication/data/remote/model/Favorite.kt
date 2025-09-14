@@ -1,9 +1,14 @@
 package com.example.swimminganalysisapplication.data.remote.model
 
-import java.util.UUID
+import com.google.gson.annotations.SerializedName
 
 data class Favorite(
-    val user_id: UUID,
-    val menu_id: UUID,
-    val favorited_at: String
+    @SerializedName("favorite_id")
+    val favoriteId: Int,
+    @SerializedName("user_id")
+    val userId: Int,
+    @SerializedName("menu_id")
+    val menuId: Int,
+    @SerializedName("favorite_create_at")
+    val favoriteCreateAt: String
 )

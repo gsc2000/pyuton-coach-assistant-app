@@ -1,11 +1,18 @@
 package com.example.swimminganalysisapplication.data.remote.model
 
-import java.util.UUID
+import com.google.gson.annotations.SerializedName
 
 data class User(
-    val id: UUID,
-    val username: String,
-    val email: String?,
-    val created_at: String,
-    val updated_at: String
+    @SerializedName("user_id")
+    val userId: Int,
+    @SerializedName("user_name")
+    val userName: String,
+    @SerializedName("user_email")
+    val userEmail: String,
+    @SerializedName("user_birthday")
+    val userBirthday: String?,
+    @SerializedName("user_create_at")
+    val userCreateAt: String,
+    @SerializedName("user_update_at")
+    val userUpdateAt: String
 )

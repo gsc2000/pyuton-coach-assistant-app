@@ -80,4 +80,10 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0") // Gson converter
     implementation("com.squareup.okhttp3:okhttp:4.12.0")          // OkHttp
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0") // Optional: For logging
+
+    // DataStore for preferences
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }
