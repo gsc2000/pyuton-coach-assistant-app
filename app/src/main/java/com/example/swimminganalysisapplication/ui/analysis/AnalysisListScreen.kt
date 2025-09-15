@@ -89,11 +89,6 @@ fun AnalysisListScreen(
                     navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { /* TODO: Navigate to video selection */ }) {
-                Icon(Icons.Filled.Add, contentDescription = "新しい分析を開始")
-            }
         }
     ) { padding ->
         Box(

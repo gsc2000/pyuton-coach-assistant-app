@@ -519,10 +519,17 @@ fun VideoScreen(navController: NavController) {
                 title = { Text("動画比較 & 解析") },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
                 actions = {
+                    Button(
+                        onClick = { /* TODO: Navigate to Analysis Creation Screen */ },
+                        enabled = exoPlayer1 != null || exoPlayer2 != null
+                    ) {
+                        Text("解析")
+                    }
                     IconButton(onClick = { navController.navigate(AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE) }) {
                         Icon(Icons.Filled.Assessment, "分析結果一覧")
                     }
                     IconButton(onClick = {
+// ...existing code...
                         val encodedUri1 = videoUri1?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
                         val encodedUri2 = videoUri2?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
 
