@@ -14,5 +14,7 @@ data class Analysis(
     @SerializedName("video_compare_analysis_json_path")
     val videoCompareAnalysisJsonPath: String?,
     @SerializedName("menu_id")
-    val menuId: Int?
+    val menuId: Int?,
+    @SerializedName("status")
+    val status: String?
 )

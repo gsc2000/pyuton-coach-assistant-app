@@ -21,6 +21,12 @@ import com.example.swimminganalysisapplication.data.remote.RetrofitClient
 import com.example.swimminganalysisapplication.data.storage.UserPreferences
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.analysis.AnalysisListScreen
+import com.example.swimminganalysisapplication.ui.analysis.AnalysisProgressScreen
+import com.example.swimminganalysisapplication.ui.analysis.AnalysisProgressViewModelFactory
+import com.example.swimminganalysisapplication.ui.analysis.SingleAnalysisResultScreen
+import com.example.swimminganalysisapplication.ui.analysis.SingleAnalysisResultViewModelFactory
+import com.example.swimminganalysisapplication.ui.analysis.SingleAnalysisSetupScreen
+import com.example.swimminganalysisapplication.ui.analysis.SingleAnalysisSetupViewModelFactory
 import com.example.swimminganalysisapplication.ui.home.HomeScreen
 import com.example.swimminganalysisapplication.ui.login.CreateAccountScreen
 import com.example.swimminganalysisapplication.ui.login.LoginScreen
@@ -45,6 +51,7 @@ class MainActivity : ComponentActivity() {
     private val createPracticeMenuViewModelFactory by lazy { CreatePracticeMenuViewModelFactory(swimmingRepository) }
     private val loginViewModelFactory: LoginViewModelFactory by lazy { LoginViewModelFactory(swimmingRepository, userPreferences) }
     private val playerViewModelFactory: PlayerViewModelFactory by lazy { PlayerViewModelFactory(swimmingRepository) }
+    private val singleAnalysisSetupViewModelFactory: SingleAnalysisSetupViewModelFactory by lazy { SingleAnalysisSetupViewModelFactory(swimmingRepository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -158,22 +165,46 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(
-                            route = AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE + "?playerId={playerId}&playerName={playerName}",
-                            arguments = listOf(
-                                navArgument("playerId") {
-                                    type = NavType.IntType
-                                    defaultValue = -1
-                                },
-                                navArgument("playerName") {
-                                    type = NavType.StringType
-                                    nullable = true
-                                }
-                            )
-                        ) { backStackEntry ->
+                            route = AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE
+                        ) {
                             AnalysisListScreen(
-                                navController = navController,
-                                playerId = backStackEntry.arguments?.getInt("playerId") ?: -1,
-                                playerName = backStackEntry.arguments?.getString("playerName")
+                                navController = navController
+                            )
+                        }
+                        composable(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE) {
+                            SingleAnalysisSetupScreen(
+                                viewModel = viewModel(factory = singleAnalysisSetupViewModelFactory),
+                                navController = navController
+                            )
+                        }
+                        composable(
+                            route = AppDestinations.ANALYSIS_PROGRESS_ROUTE + "/{analysisId}",
+                            arguments = listOf(navArgument("analysisId") { type = NavType.IntType })
+                        ) { backStackEntry ->
+                            val analysisId = backStackEntry.arguments?.getInt("analysisId") ?: -1
+                            AnalysisProgressScreen(
+                                viewModel = viewModel(
+                                    factory = AnalysisProgressViewModelFactory(
+                                        swimmingRepository,
+                                        analysisId
+                                    )
+                                ),
+                                navController = navController
+                            )
+                        }
+                        composable(
+                            route = AppDestinations.SINGLE_ANALYSIS_RESULT_ROUTE + "/{analysisId}",
+                            arguments = listOf(navArgument("analysisId") { type = NavType.IntType })
+                        ) { backStackEntry ->
+                            val analysisId = backStackEntry.arguments?.getInt("analysisId") ?: -1
+                            SingleAnalysisResultScreen(
+                                viewModel = viewModel(
+                                    factory = SingleAnalysisResultViewModelFactory(
+                                        swimmingRepository,
+                                        analysisId
+                                    )
+                                ),
+                                navController = navController
                             )
                         }
                     }

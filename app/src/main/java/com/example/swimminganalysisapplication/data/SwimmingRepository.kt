@@ -3,6 +3,8 @@ package com.example.swimminganalysisapplication.data
 import android.util.Log
 import com.example.swimminganalysisapplication.data.remote.ApiService
 import com.example.swimminganalysisapplication.data.remote.model.*
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 
 class SwimmingRepository(private val apiService: ApiService) {
@@ -36,8 +38,8 @@ class SwimmingRepository(private val apiService: ApiService) {
 
 
     // --- Player ---
-    suspend fun createPlayer(player: Player): Player? = handleResponse({ apiService.createPlayer(player) }, "Created player", "createPlayer")
-    suspend fun getPlayers(): List<Player>? = handleResponse({ apiService.getPlayers() }, "Fetched players", "getPlayers")
+    suspend fun createPlayer(player: PlayerCreate): Player? = handleResponse({ apiService.createPlayer(player) }, "Created player", "createPlayer")
+    suspend fun getPlayers(query: String? = null): List<Player>? = handleResponse({ apiService.getPlayers(query) }, "Fetched players", "getPlayers")
     suspend fun getPlayer(id: Int): Player? = handleResponse({ apiService.getPlayer(id) }, "Fetched player", "getPlayer")
     suspend fun updatePlayer(id: Int, player: Player): Player? = handleResponse({ apiService.updatePlayer(id, player) }, "Updated player", "updatePlayer")
     suspend fun deletePlayer(id: Int): Boolean = handleResponse({ apiService.deletePlayer(id) }, "Deleted player", "deletePlayer") != null
@@ -75,6 +77,14 @@ class SwimmingRepository(private val apiService: ApiService) {
     // --- Analysis ---
     suspend fun createAnalysis(analysis: Analysis): Analysis? = handleResponse({ apiService.createAnalysis(analysis) }, "Created analysis", "createAnalysis")
     suspend fun getAnalyses(): List<Analysis>? = handleResponse({ apiService.getAnalyses() }, "Fetched analyses", "getAnalyses")
+    suspend fun getAnalysis(id: Int): Analysis? = handleResponse({ apiService.getAnalysis(id) }, "Fetched analysis", "getAnalysis")
+    suspend fun uploadSingleAnalysis(
+        date: RequestBody,
+        playerId: RequestBody,
+        comment: RequestBody,
+        video: MultipartBody.Part
+    ): Analysis? = handleResponse({ apiService.uploadSingleAnalysis(date, playerId, comment, video) }, "Uploaded single analysis", "uploadSingleAnalysis")
+
     suspend fun getAnalysisJson(url: String): String? {
         return try {
             val response = apiService.getAnalysisJson(url)

@@ -1,6 +1,8 @@
 package com.example.swimminganalysisapplication.data.remote
 
 import com.example.swimminganalysisapplication.data.remote.model.*
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -26,10 +28,10 @@ interface ApiService {
 
     // Player endpoints
     @POST("players/")
-    suspend fun createPlayer(@Body player: Player): Response<Player>
+    suspend fun createPlayer(@Body player: PlayerCreate): Response<Player>
 
     @GET("players/")
-    suspend fun getPlayers(): Response<List<Player>>
+    suspend fun getPlayers(@Query("q") query: String?): Response<List<Player>>
 
     @GET("players/{id}")
     suspend fun getPlayer(@Path("id") id: Int): Response<Player>
@@ -101,6 +103,18 @@ interface ApiService {
 
     @GET("analyses/")
     suspend fun getAnalyses(): Response<List<Analysis>>
+
+    @GET("analyses/{id}")
+    suspend fun getAnalysis(@Path("id") id: Int): Response<Analysis>
+
+    @Multipart
+    @POST("analyses/single")
+    suspend fun uploadSingleAnalysis(
+        @Part("date") date: RequestBody,
+        @Part("player_id") playerId: RequestBody,
+        @Part("comment") comment: RequestBody,
+        @Part video: MultipartBody.Part
+    ): Response<Analysis>
 
     // Attachment endpoints
     @POST("attachments/")

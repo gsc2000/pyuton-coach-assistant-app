@@ -31,6 +31,22 @@ private const val TAG_HOME = "HomeScreen"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AnalysisTypeSelectionDialog(
+            onDismissRequest = { showDialog = false },
+            onSingleAnalysisClick = {
+                showDialog = false
+                navController.navigate(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE)
+            },
+            onComparisonAnalysisClick = {
+                showDialog = false
+                navController.navigate(AppDestinations.VIDEO_SCREEN_ROUTE)
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,9 +115,9 @@ fun HomeScreen(navController: NavController) {
             Divider(modifier = Modifier.padding(vertical = 16.dp))
 
             HomeNavigationCard(
-                title = "動画解析を開始",
+                title = "解析",
                 icon = Icons.Filled.Analytics,
-                onClick = { navController.navigate(AppDestinations.VIDEO_SCREEN_ROUTE) }
+                onClick = { showDialog = true }
             )
 
             HomeNavigationCard(

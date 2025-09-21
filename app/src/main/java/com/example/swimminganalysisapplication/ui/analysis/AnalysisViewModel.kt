@@ -13,8 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class AnalysisViewModel(
-    private val repository: SwimmingRepository,
-    private val playerId: Int?
+    private val repository: SwimmingRepository
 ) : ViewModel() {
 
     private val _analysisResults = MutableStateFlow<List<Analysis>>(emptyList())
@@ -74,9 +73,9 @@ class AnalysisViewModel(
         viewModelScope.launch {
             // TODO: Replace this mock implementation with actual API call
             _analysisResults.value = listOf(
-                Analysis(analysisId = 1, video1Id = 101, video2Id = 102, userId = 1, videoCompareAnalysisJsonPath = "/path/to/json1.json", menuId = 1),
-                Analysis(analysisId = 2, video1Id = 103, video2Id = null, userId = 1, videoCompareAnalysisJsonPath = "/path/to/json2.json", menuId = 1),
-                Analysis(analysisId = 3, video1Id = 104, video2Id = 105, userId = 2, videoCompareAnalysisJsonPath = "/path/to/json3.json", menuId = 2)
+                Analysis(analysisId = 1, video1Id = 101, video2Id = 102, userId = 1, videoCompareAnalysisJsonPath = "/path/to/json1.json", menuId = 1, status = "SUCCESS"),
+                Analysis(analysisId = 2, video1Id = 103, video2Id = null, userId = 1, videoCompareAnalysisJsonPath = "/path/to/json2.json", menuId = 1, status = "PROCESSING"),
+                Analysis(analysisId = 3, video1Id = 104, video2Id = 105, userId = 2, videoCompareAnalysisJsonPath = "/path/to/json3.json", menuId = 2, status = "FAILURE")
             )
             /*
             try {

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.model.Player
+import com.example.swimminganalysisapplication.data.remote.model.PlayerCreate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -73,7 +74,7 @@ class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() 
                     )
 
                 if (playerToSave.playerId == 0) {
-                    repository.createPlayer(playerToSave)
+                    repository.createPlayer(PlayerCreate(playerName = playerToSave.playerName))
                 } else {
                     repository.updatePlayer(playerToSave.playerId, playerToSave)
                 }

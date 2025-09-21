@@ -17,5 +17,8 @@ object AppDestinations {
     const val PLAYER_LIST_SCREEN_ROUTE = "player_list_screen"
     const val PLAYER_EDIT_SCREEN_ROUTE = "player_edit_screen"
     const val ANALYSIS_LIST_SCREEN_ROUTE = "analysis_list_screen"
+    const val SINGLE_ANALYSIS_SETUP_ROUTE = "single_analysis_setup_screen"
+    const val ANALYSIS_PROGRESS_ROUTE = "analysis_progress_screen"
+    const val SINGLE_ANALYSIS_RESULT_ROUTE = "single_analysis_result_screen"
 }
 

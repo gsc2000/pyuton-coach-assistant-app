@@ -46,14 +46,12 @@ import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalysisListScreen(
-    navController: NavController,
-    playerId: Int,
-    playerName: String?
+    navController: NavController
 ) {
     val context = LocalContext.current
     val repository = SwimmingRepository(RetrofitClient.getInstance(context))
     val viewModel: AnalysisViewModel = viewModel(
-        factory = AnalysisViewModelFactory(repository, if (playerId == -1) null else playerId)
+        factory = AnalysisViewModelFactory(repository)
     )
     val analysisResults by viewModel.analysisResults.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -70,7 +68,7 @@ fun AnalysisListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = if (playerName.isNullOrEmpty()) "分析結果一覧" else "$playerName の分析結果") },
+                title = { Text(text = "分析結果一覧") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(

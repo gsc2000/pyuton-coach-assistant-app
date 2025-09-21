@@ -1,4 +1,0 @@
-/Users/gasu/Library/Android/sdk/cmake/3.22.1/bin/ninja \
-  -C \
-  /Users/gasu/AndroidStudioProjects/PyutonCoachAssistantApp/opencv/.cxx/Debug/543s4n3f/arm64-v8a \
-  opencv_jni_shared

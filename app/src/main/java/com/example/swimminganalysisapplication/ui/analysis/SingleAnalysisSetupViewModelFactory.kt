@@ -4,13 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 
-class AnalysisViewModelFactory(
-    private val repository: SwimmingRepository
-) : ViewModelProvider.Factory {
+class SingleAnalysisSetupViewModelFactory(private val repository: SwimmingRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(AnalysisViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(SingleAnalysisSetupViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return AnalysisViewModel(repository) as T
+            return SingleAnalysisSetupViewModel(repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
