@@ -58,6 +58,12 @@ interface ApiService {
     @DELETE("menus/{id}")
     suspend fun deleteMenu(@Path("id") id: Int): Response<Unit>
 
+    @GET("menus/{id}/chats")
+    suspend fun getMenuChats(@Path("id") id: String): Response<List<Chat>>
+
+    @GET("menus/{id}/chat_threads")
+    suspend fun getMenuChatThreads(@Path("id") id: String): Response<List<ChatThread>>
+
     // Tag endpoints
     @POST("tags/")
     suspend fun createTag(@Body tag: ApiTag): Response<ApiTag>

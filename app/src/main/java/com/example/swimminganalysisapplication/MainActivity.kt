@@ -1,12 +1,14 @@
 package com.example.swimminganalysisapplication
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -32,6 +34,7 @@ import com.example.swimminganalysisapplication.ui.login.CreateAccountScreen
 import com.example.swimminganalysisapplication.ui.login.LoginScreen
 import com.example.swimminganalysisapplication.ui.login.LoginViewModelFactory
 import com.example.swimminganalysisapplication.ui.menucomments.MenuCommentsScreen
+import com.example.swimminganalysisapplication.ui.menucomments.MenuCommentsViewModelFactory
 import com.example.swimminganalysisapplication.ui.player.PlayerEditScreen
 import com.example.swimminganalysisapplication.ui.player.PlayerListScreen
 import com.example.swimminganalysisapplication.ui.player.PlayerViewModelFactory
@@ -67,22 +70,35 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = AppDestinations.LOGIN_SCREEN_ROUTE // Start destination changed
+                        startDestination = AppDestinations.LOGIN_SCREEN_ROUTE
                     ) {
                         composable(
-                            route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE,
-                            arguments = listOf(navArgument("menuId") { type = NavType.StringType; nullable = true })
+                            route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE, //例: "menu_comments/{menuId}"
+                            arguments = listOf(navArgument("menuId") { type = NavType.StringType }) // NavType.StringType に変更
                         ) { backStackEntry ->
-                            val menuId = backStackEntry.arguments?.getString("menuId")
-                            MenuCommentsScreen(navController = navController, menuId = menuId)
+                            val menuIdString = backStackEntry.arguments?.getString("menuId")
+
+                            if (menuIdString != null) {
+                                Log.d("MainActivity", "NavHost: Navigated to menu_comments with menuId (String): $menuIdString")
+                                // menuIdForFactory が正常に Int になった場合のみ ViewModel を初期化
+                                val factory = MenuCommentsViewModelFactory(swimmingRepository, userPreferences, menuIdString)
+                                MenuCommentsScreen(
+                                    navController = navController,
+                                    viewModel = viewModel(factory = factory)
+                                )
+                            } else {
+                                Log.e("MainActivity", "NavHost: menuIdString is null for MENU_COMMENTS_WITH_ARG_ROUTE.")
+                                // menuIdがない場合は、前の画面に戻るなどのエラーハンドリング
+                                navController.popBackStack()
+                            }
                         }
-                        composable(AppDestinations.LOGIN_SCREEN_ROUTE) { // New route
+                        composable(AppDestinations.LOGIN_SCREEN_ROUTE) {
                             LoginScreen(
                                 navController = navController,
                                 viewModel = viewModel(factory = loginViewModelFactory)
                             )
                         }
-                        composable(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE) { // New route
+                        composable(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE) {
                             CreateAccountScreen(navController = navController)
                         }
                         composable(AppDestinations.HOME_SCREEN_ROUTE) {
@@ -119,12 +135,11 @@ class MainActivity : ComponentActivity() {
                                 duration2Ms = duration2MsArg
                             )
                         }
-                        // ★ DiscoverScreen のルートを追加
                         composable(AppDestinations.DISCOVER_SCREEN_ROUTE) {
                             DiscoverScreen(navController = navController)
                         }
                         composable(
-                            route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE, // 引数ありルート
+                            route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE,
                             arguments = listOf(navArgument("menuId") { type = NavType.StringType; nullable = true })
                         ) { backStackEntry ->
                             val menuId = backStackEntry.arguments?.getString("menuId")
@@ -137,7 +152,7 @@ class MainActivity : ComponentActivity() {
                         composable(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
                             PracticeListScreen(navController = navController)
                         }
-                        composable(AppDestinations.FAVORITES_SCREEN_ROUTE) { // ★ これが追加されていることを確認
+                        composable(AppDestinations.FAVORITES_SCREEN_ROUTE) {
                             FavoritesScreen(navController = navController)
                         }
                         composable(AppDestinations.PLAYER_LIST_SCREEN_ROUTE) {
@@ -157,7 +172,7 @@ class MainActivity : ComponentActivity() {
                                 playerId = backStackEntry.arguments?.getString("playerId")
                             )
                         }
-                        composable(AppDestinations.PLAYER_EDIT_SCREEN_ROUTE) {
+                        composable(AppDestinations.PLAYER_EDIT_SCREEN_ROUTE) { // For creating new player
                             PlayerEditScreen(
                                 navController = navController,
                                 viewModel = viewModel(factory = playerViewModelFactory),

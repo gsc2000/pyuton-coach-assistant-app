@@ -50,6 +50,8 @@ class SwimmingRepository(private val apiService: ApiService) {
     suspend fun getMenu(id: Int): Menu? = handleResponse({ apiService.getMenu(id) }, "Fetched menu", "getMenu")
     suspend fun updateMenu(id: Int, menu: Menu): Menu? = handleResponse({ apiService.updateMenu(id, menu) }, "Updated menu", "updateMenu")
     suspend fun deleteMenu(id: Int): Boolean = handleResponse({ apiService.deleteMenu(id) }, "Deleted menu", "deleteMenu") != null
+    suspend fun getMenuChats(id: String): List<Chat>? = handleResponse({ apiService.getMenuChats(id) }, "Fetched menu chats", "getMenuChats")
+    suspend fun getMenuChatThreads(id: String): List<ChatThread>? = handleResponse({ apiService.getMenuChatThreads(id) }, "Fetched menu chat threads", "getMenuChatThreads")
 
     // --- Tag ---
     suspend fun createTag(tag: ApiTag): ApiTag? = handleResponse({ apiService.createTag(tag) }, "Created tag", "createTag")
