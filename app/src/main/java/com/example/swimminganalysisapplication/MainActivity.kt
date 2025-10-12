@@ -8,7 +8,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -80,7 +79,6 @@ class MainActivity : ComponentActivity() {
 
                             if (menuIdString != null) {
                                 Log.d("MainActivity", "NavHost: Navigated to menu_comments with menuId (String): $menuIdString")
-                                // menuIdForFactory が正常に Int になった場合のみ ViewModel を初期化
                                 val factory = MenuCommentsViewModelFactory(swimmingRepository, userPreferences, menuIdString)
                                 MenuCommentsScreen(
                                     navController = navController,
@@ -88,7 +86,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             } else {
                                 Log.e("MainActivity", "NavHost: menuIdString is null for MENU_COMMENTS_WITH_ARG_ROUTE.")
-                                // menuIdがない場合は、前の画面に戻るなどのエラーハンドリング
                                 navController.popBackStack()
                             }
                         }
@@ -99,7 +96,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE) {
-                            CreateAccountScreen(navController = navController)
+                            CreateAccountScreen(onNavigateBack = { navController.popBackStack() })
                         }
                         composable(AppDestinations.HOME_SCREEN_ROUTE) {
                             HomeScreen(navController = navController)
@@ -192,35 +189,36 @@ class MainActivity : ComponentActivity() {
                                 navController = navController
                             )
                         }
+                        // ★★★★★★★★★★ ここから修正 ★★★★★★★★★★
                         composable(
-                            route = AppDestinations.ANALYSIS_PROGRESS_ROUTE + "/{analysisId}",
+                            route = "${AppDestinations.ANALYSIS_PROGRESS_ROUTE}/{analysisId}",
                             arguments = listOf(navArgument("analysisId") { type = NavType.IntType })
                         ) { backStackEntry ->
-                            val analysisId = backStackEntry.arguments?.getInt("analysisId") ?: -1
-                            AnalysisProgressScreen(
-                                viewModel = viewModel(
-                                    factory = AnalysisProgressViewModelFactory(
-                                        swimmingRepository,
-                                        analysisId
-                                    )
-                                ),
-                                navController = navController
-                            )
+                            val analysisId = backStackEntry.arguments?.getInt("analysisId")
+                            if (analysisId != null) {
+                                val factory = AnalysisProgressViewModelFactory(swimmingRepository, analysisId)
+                                AnalysisProgressScreen(
+                                    viewModel = viewModel(factory = factory),
+                                    navController = navController
+                                )
+                            } else {
+                                Log.e("MainActivity", "NavHost: analysisId is null for ANALYSIS_PROGRESS_ROUTE.")
+                                navController.popBackStack()
+                            }
                         }
+                        // ★★★★★★★★★★ ここまで修正 ★★★★★★★★★★
                         composable(
-                            route = AppDestinations.SINGLE_ANALYSIS_RESULT_ROUTE + "/{analysisId}",
+                            route = "${AppDestinations.SINGLE_ANALYSIS_RESULT_ROUTE}/{analysisId}",
                             arguments = listOf(navArgument("analysisId") { type = NavType.IntType })
                         ) { backStackEntry ->
-                            val analysisId = backStackEntry.arguments?.getInt("analysisId") ?: -1
-                            SingleAnalysisResultScreen(
-                                viewModel = viewModel(
-                                    factory = SingleAnalysisResultViewModelFactory(
-                                        swimmingRepository,
-                                        analysisId
-                                    )
-                                ),
-                                navController = navController
-                            )
+                            val analysisId = backStackEntry.arguments?.getInt("analysisId")
+                            if (analysisId != null) {
+                                val factory = SingleAnalysisResultViewModelFactory(swimmingRepository, analysisId)
+                                SingleAnalysisResultScreen(
+                                    viewModel = viewModel(factory = factory),
+                                    navController = navController
+                                )
+                            }
                         }
                     }
                 }
