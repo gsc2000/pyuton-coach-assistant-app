@@ -2,17 +2,38 @@ package com.example.swimminganalysisapplication.data.remote.model
 
 import com.google.gson.annotations.SerializedName
 
+/**
+ * APIレスポンス用 ユーザー情報スキーマ (OpenAPI仕様準拠)
+ */
 data class User(
-    @SerializedName("user_id")
+    @SerializedName("userId")
     val userId: Int,
-    @SerializedName("user_name")
+    @SerializedName("userName")
     val userName: String,
-    @SerializedName("user_email")
+    @SerializedName("userEmail")
     val userEmail: String,
-    @SerializedName("user_birthday")
+    @SerializedName("userBirthday")
     val userBirthday: String?,
-    @SerializedName("user_create_at")
+    @SerializedName("userHashPassword")
+    val userHashPassword: String,
+    @SerializedName("userCreateAt")
     val userCreateAt: String,
-    @SerializedName("user_update_at")
-    val userUpdateAt: String
+    @SerializedName("userUpdateAt")
+    val userUpdateAt: String?,
+    @SerializedName("userIsActive")
+    val userIsActive: Boolean
+)
+
+/**
+ * APIリクエスト用 ユーザー作成スキーマ (OpenAPI仕様準拠)
+ */
+data class UserCreate(
+    @SerializedName("userName")
+    val userName: String,
+    @SerializedName("userEmail")
+    val userEmail: String,
+    @SerializedName("userPassword")
+    val userPassword: String,
+    @SerializedName("userBirthday")
+    val userBirthday: String? = null
 )

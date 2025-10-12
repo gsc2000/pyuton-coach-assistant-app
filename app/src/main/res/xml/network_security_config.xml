@@ -2,5 +2,6 @@
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">10.0.2.2</domain> <!-- Localhost for Android Emulator -->
+        <domain includeSubdomains="true">100.98.57.38</domain> <!-- API server -->
     </domain-config>
 </network-security-config>

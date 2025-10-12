@@ -11,7 +11,8 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
 
     // private const val BASE_URL = "https://swimming-race-analysis-db-e037cf1a2449.herokuapp.com/" // Heroku (Production)
-    private const val BASE_URL = "http://10.0.2.2:8000/" // Local FastAPI for Emulator (Development)
+//    private const val BASE_URL = "http://10.0.2.2:8000/" // Local FastAPI for Emulator (Development)
+    private const val BASE_URL = "http://100.98.57.38/" // Local FastAPI for Emulator (Development)
 
     private var INSTANCE: ApiService? = null
 

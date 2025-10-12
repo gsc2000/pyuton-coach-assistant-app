@@ -3,7 +3,8 @@ package com.example.swimminganalysisapplication.ui.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
-import com.example.swimminganalysisapplication.data.storage.UserPreferences
+import com.example.swimminganalysisapplication.data.storage.UserPreferences // ★ インポートパスを修正
+import com.example.swimminganalysisapplication.data.remote.model.UserLogin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,25 +36,30 @@ class LoginViewModel(
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
             try {
-                val credentials = mapOf("username" to _email.value, "password" to _password.value)
-                val response = repository.login(credentials)
-                if (response.isSuccessful && response.body() != null) {
-                    val token = response.body()!!.access_token
-                    userPreferences.saveAuthToken(token)
-                    _loginState.value = LoginState.Success
+                // UserLoginオブジェクトを作成してリポジトリに渡す
+                val userLogin = UserLogin(userEmail = _email.value, userPassword = _password.value)
+                val token = repository.login(userLogin)
+
+                if (token != null) {
+                    // 成功時：トークンを保存
+                    userPreferences.saveAuthToken(token.accessToken)
+                    _loginState.value = LoginState.Success("Login successful")
                 } else {
-                    _loginState.value = LoginState.Error("Login failed: ${response.message()}")
+                    // 失敗時：リポジトリがnullを返した場合
+                    _loginState.value = LoginState.Error("ログインに失敗しました。メールアドレスまたはパスワードを確認してください。")
                 }
             } catch (e: Exception) {
-                _loginState.value = LoginState.Error("Login failed: ${e.message}")
+                // 失敗時：ネットワークエラーなど
+                _loginState.value = LoginState.Error(e.message ?: "不明なエラーが発生しました。")
             }
         }
     }
 }
 
+// LoginScreenが期待するUIの状態を定義
 sealed class LoginState {
     object Idle : LoginState()
     object Loading : LoginState()
-    object Success : LoginState()
+    data class Success(val message: String) : LoginState()
     data class Error(val message: String) : LoginState()
 }

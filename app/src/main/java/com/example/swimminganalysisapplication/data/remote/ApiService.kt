@@ -12,19 +12,22 @@ interface ApiService {
     @GET
     suspend fun getAnalysisJson(@Url url: String): Response<ResponseBody>
 
-    // User endpoints
-    @POST("users/")
-    suspend fun createUser(@Body user: User): Response<User>
+    // --- Auth Endpoints (OpenAPI仕様準拠) ---
+    @POST("/api/v1/auth/register")
+    suspend fun register(@Body userCreate: UserCreate): Response<User>
 
-    @GET("users/{id}")
-    suspend fun getUser(@Path("id") id: Int): Response<User>
+    @POST("/api/v1/auth/login")
+    suspend fun login(@Body userLogin: UserLogin): Response<Token>
 
-    @POST("token")
-    suspend fun login(@Body credentials: Map<String, String>): Response<Token>
-
-    @GET("users/me/")
+    @GET("/api/v1/auth/me")
     suspend fun getMe(): Response<User>
 
+
+    // --- ここから下の古いエンドポイントは、今後のエラー発生時に順次修正します ---
+
+    // User endpoints
+    @GET("users/{id}")
+    suspend fun getUser(@Path("id") id: Int): Response<User>
 
     // Player endpoints
     @POST("players/")
@@ -129,4 +132,3 @@ interface ApiService {
     @GET("attachments/")
     suspend fun getAttachments(): Response<List<Attachment>>
 }
-
