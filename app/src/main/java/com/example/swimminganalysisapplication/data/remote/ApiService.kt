@@ -23,7 +23,7 @@ interface ApiService {
     suspend fun getMe(): Response<User>
 
 
-    // --- ここから下の古いエンドポイントは、今後のエラー発生時に順次修正します ---
+    // --- ここから下は、今後のエラー発生時に順次修正します ---
 
     // User endpoints
     @GET("users/{id}")
@@ -45,27 +45,27 @@ interface ApiService {
     @DELETE("players/{id}")
     suspend fun deletePlayer(@Path("id") id: Int): Response<Unit>
 
-    // Menu endpoints
-    // ★★★ ここから追記 ★★★
+    // --- Menu Endpoints (OpenAPI仕様準拠に修正) ---
     @GET("/api/v1/menus/user/{user_id}")
     suspend fun getMenusByUserId(@Path("user_id") userId: Int): Response<List<Menu>>
-    // ★★★ ここまで追記 ★★★
 
-    @POST("menus/")
+    @POST("/api/v1/menus/")
     suspend fun createMenu(@Body menu: Menu): Response<Menu>
 
-    @GET("menus/")
+    @GET("menus/") // This seems to be an unused endpoint for getting all menus, leaving as is for now.
     suspend fun getMenus(): Response<List<Menu>>
 
-    @GET("menus/{id}")
+    @GET("/api/v1/menus/{id}")
     suspend fun getMenu(@Path("id") id: Int): Response<Menu>
 
-    @PUT("menus/{id}")
+    @PUT("/api/v1/menus/{id}")
     suspend fun updateMenu(@Path("id") id: Int, @Body menu: Menu): Response<Menu>
 
-    @DELETE("menus/{id}")
+    @DELETE("/api/v1/menus/{id}")
     suspend fun deleteMenu(@Path("id") id: Int): Response<Unit>
 
+
+    // --- Menu Sub-resources (To be reviewed) ---
     @GET("menus/{id}/chats")
     suspend fun getMenuChats(@Path("id") id: String): Response<List<Chat>>
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -69,7 +71,8 @@ fun PracticeListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                navController.navigate(AppDestinations.CREATE_PRACTICE_MENU_ROUTE)
+                // menuIdを渡さずに遷移することで、新規作成モードで開く
+                navController.navigate("${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId=null")
             }) {
                 Icon(Icons.Filled.Add, contentDescription = "練習メニューを作成")
             }
@@ -113,6 +116,9 @@ fun PracticeListScreen(
 
 @Composable
 fun PracticeMenuItem(menu: Menu, onClick: () -> Unit) {
+    // 説明文から ---items--- 以降を取り除く
+    val displayDescription = menu.menuDescription?.split("---items---")?.getOrNull(0)?.trim() ?: ""
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -124,10 +130,22 @@ fun PracticeMenuItem(menu: Menu, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                // ★★★ 修正点: menuTitleがnullの場合のデフォルト値を追加 ★★★
-                Text(text = menu.menuTitle ?: "（無題）", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                // ★★★ 修正点: menuDescriptionがnullの場合のデフォルト値を確認・徹底 ★★★
-                Text(text = menu.menuDescription ?: "", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = menu.menuTitle ?: "（無題）",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // 説明文がある場合のみ表示
+                if (displayDescription.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = displayDescription,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2, // 長すぎる場合に省略
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }

@@ -26,7 +26,6 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
             _uiState.value = UiState.Loading
             try {
                 val menu = repository.getMenu(menuId)
-                // ★★★ ここにログを追加 ★★★
                 Log.d("DEBUG_MENU", "Loaded menu from repository: $menu")
                 _practiceMenu.value = menu
                 _uiState.value = UiState.Success
@@ -55,37 +54,41 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                         menuTitle = title,
                         menuDescription = fullDescription,
                         menuIsPublic = isPublic
-                        // tags are handled via MenuTagRelation
+                        // tags are handled separately
                     )
                     if (menuToUpdate != null) {
                         repository.updateMenu(existingMenuId, menuToUpdate)
                     } else {
-                        throw Exception("Menu not found for updating")
+                        throw Exception("更新対象のメニューが見つかりません。")
                     }
                 } else {
                     // Create new menu
+                    val currentUser = repository.getMe()
+                    if (currentUser == null) {
+                        throw Exception("ユーザー情報が取得できません。再度ログインしてください。")
+                    }
+
+                    // ★★★ 正しいユーザーIDを設定し、orgIdは0を仮設定 ★★★
                     val newMenu = Menu(
-                        menuId = 0, // Server will generate ID
-                        menuOrgId = 0, // TODO:
+                        menuId = 0, // サーバー側で自動採番
+                        menuOrgId = 0, // サーバーのデフォルト値に期待
                         menuTitle = title,
                         menuDescription = fullDescription,
                         menuIsPublic = isPublic,
                         menuIsForked = false,
                         menuForkedFromMenuId = null,
                         menuVersion = 1,
-                        menuCreateAt = "", // Server will set this
-                        menuUpdateAt = "",  // Server will set this
-                        userId = 0, // This should come from the logged-in user
+                        menuCreateAt = "", // サーバー側で設定
+                        menuUpdateAt = "",  // サーバー側で設定
+                        userId = currentUser.userId, // ★★★ 正しいユーザーID ★★★
                         playerId = null,
                         menuTagId = null
                     )
                     repository.createMenu(newMenu)
                 }
-                // ★★★ 成功時のUI State更新を修正 ★★★
-                // UiState.Success を object に変更したため、引数なしで呼び出す
                 _uiState.value = UiState.Success
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to save menu")
+                _uiState.value = UiState.Error(e.message ?: "メニューの保存に失敗しました。")
             }
         }
     }
@@ -118,6 +121,7 @@ sealed class UiState {
     data class Error(val message: String) : UiState()
 }
 
+// ViewModelFactoryは変更なし
 class CreatePracticeMenuViewModelFactory(private val repository: SwimmingRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CreatePracticeMenuViewModel::class.java)) {

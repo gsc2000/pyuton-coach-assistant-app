@@ -9,7 +9,7 @@ import retrofit2.Response
 
 class SwimmingRepository(private val apiService: ApiService) {
 
-    // ★★★ ご指摘の通り、メニューリストのインメモリキャッシュを実装します ★★★
+    // メニューリストのインメモリキャッシュ
     private var menusCache: List<Menu>? = null
 
     private suspend fun <T> handleResponse(
@@ -37,9 +37,6 @@ class SwimmingRepository(private val apiService: ApiService) {
     suspend fun login(userLogin: UserLogin): Token? = handleResponse({ apiService.login(userLogin) }, "login")
     suspend fun getMe(): User? = handleResponse({ apiService.getMe() }, "getMe")
 
-
-    // --- ここから下は、今後のエラー発生時に順次修正します ---
-
     // User endpoints
     suspend fun getUser(id: Int): User? = handleResponse({ apiService.getUser(id) }, "getUser")
 
@@ -50,79 +47,84 @@ class SwimmingRepository(private val apiService: ApiService) {
     suspend fun updatePlayer(id: Int, player: Player): Player? = handleResponse({ apiService.updatePlayer(id, player) }, "updatePlayer")
     suspend fun deletePlayer(id: Int): Boolean = handleResponse({ apiService.deletePlayer(id) }, "deletePlayer") != null
 
-    // Menu endpoints
-    suspend fun getMenusByUserId(userId: Int): List<Menu>? {
-        // APIからメニューを取得し、キャッシュに保存する
+    // --- Menu Endpoints with Intelligent Caching ---
+    suspend fun getMenusByUserId(userId: Int, forceRefresh: Boolean = false): List<Menu>? {
+        if (menusCache != null && !forceRefresh) {
+            Log.d("SwimmingRepository", "Returning menus from cache.")
+            return menusCache
+        }
+        Log.d("SwimmingRepository", "Fetching menus from network. ForceRefresh: $forceRefresh")
         val menus = handleResponse({ apiService.getMenusByUserId(userId) }, "getMenusByUserId")
         menusCache = menus
         return menusCache
     }
 
     suspend fun createMenu(menu: Menu): Menu? {
-        // 作成時はキャッシュを無効化
-        menusCache = null
-        return handleResponse({ apiService.createMenu(menu) }, "createMenu")
+        val createdMenu = handleResponse({ apiService.createMenu(menu) }, "createMenu")
+        // 作成成功後、キャッシュに新しいメニューを追加
+        if (createdMenu != null) {
+            menusCache = menusCache?.plus(createdMenu)
+            Log.d("SwimmingRepository", "Added new menu to cache.")
+        }
+        return createdMenu
     }
 
+    // This method seems unused, but we'll leave it as is.
     suspend fun getMenus(): List<Menu>? = handleResponse({ apiService.getMenus() }, "getMenus")
 
-    // ★★★ getMenuがAPIを呼び出さず、キャッシュから探すように修正 ★★★
+    // キャッシュから単一のメニューを取得
     suspend fun getMenu(id: Int): Menu? {
-        Log.d("SwimmingRepository", "ID: $id のメニューをキャッシュから検索します。")
-        // キャッシュがなければ、念のためAPIから取得を試みる（今回は不要だが、堅牢性のために残す）
+        Log.d("SwimmingRepository", "Attempting to get menu with id $id from cache.")
         if (menusCache == null) {
-            Log.w("SwimmingRepository", "キャッシュが存在しません。一覧画面で取得に失敗した可能性があります。")
-            // 本来ならここで再度 getMenusByUserId を呼ぶべきだが、今回はViewModelのロジックに任せる
+            Log.w("SwimmingRepository", "Menu cache is null. Cannot retrieve menu item.")
             return null
         }
         val menu = menusCache?.find { it.menuId == id }
         if (menu == null) {
-            Log.w("SwimmingRepository", "ID: $id のメニューがキャッシュに見つかりませんでした。")
+            Log.w("SwimmingRepository", "Menu with id $id not found in cache.")
         } else {
-            Log.d("SwimmingRepository", "キャッシュからメニューを発見しました: $menu")
+            Log.d("SwimmingRepository", "Found menu in cache: $menu")
         }
         return menu
     }
 
     suspend fun updateMenu(id: Int, menu: Menu): Menu? {
-        // 更新時はキャッシュを無効化
-        menusCache = null
-        return handleResponse({ apiService.updateMenu(id, menu) }, "updateMenu")
+        val updatedMenu = handleResponse({ apiService.updateMenu(id, menu) }, "updateMenu")
+        // 更新成功後、キャッシュ内の該当メニューを置き換え
+        if (updatedMenu != null) {
+            menusCache = menusCache?.map {
+                if (it.menuId == id) updatedMenu else it
+            }
+            Log.d("SwimmingRepository", "Updated menu in cache.")
+        }
+        return updatedMenu
     }
 
     suspend fun deleteMenu(id: Int): Boolean {
-        // 削除時はキャッシュを無効化
-        menusCache = null
-        return handleResponse({ apiService.deleteMenu(id) }, "deleteMenu") != null
+        val success = handleResponse({ apiService.deleteMenu(id) }, "deleteMenu") != null
+        // 削除成功後、キャッシュから該当メニューを削除
+        if (success) {
+            menusCache = menusCache?.filterNot { it.menuId == id }
+            Log.d("SwimmingRepository", "Deleted menu from cache.")
+        }
+        return success
     }
+
+    // --- Other Endpoints ---
 
     suspend fun getMenuChats(id: String): List<Chat>? = handleResponse({ apiService.getMenuChats(id) }, "getMenuChats")
     suspend fun getMenuChatThreads(id: String): List<ChatThread>? = handleResponse({ apiService.getMenuChatThreads(id) }, "getMenuChatThreads")
-
-    // Tag endpoints
     suspend fun createTag(tag: ApiTag): ApiTag? = handleResponse({ apiService.createTag(tag) }, "createTag")
     suspend fun getTags(): List<ApiTag>? = handleResponse({ apiService.getTags() }, "getTags")
-
-    // MenuTagRelation endpoints
     suspend fun createMenuTagRelation(relation: MenuTagRelation): MenuTagRelation? = handleResponse({ apiService.createMenuTagRelation(relation) }, "createMenuTagRelation")
-
-    // Chat endpoints
     suspend fun createChat(chat: Chat): Chat? = handleResponse({ apiService.createChat(chat) }, "createChat")
     suspend fun getChats(): List<Chat>? = handleResponse({ apiService.getChats() }, "getChats")
-
-    // Favorite endpoints
     suspend fun createFavorite(favorite: Favorite): Favorite? = handleResponse({ apiService.createFavorite(favorite) }, "createFavorite")
     suspend fun getFavorites(): List<Favorite>? = handleResponse({ apiService.getFavorites() }, "getFavorites")
-
-    // ChatThread endpoints
     suspend fun createChatThread(chatThread: ChatThread): ChatThread? = handleResponse({ apiService.createChatThread(chatThread) }, "createChatThread")
     suspend fun getChatThreads(): List<ChatThread>? = handleResponse({ apiService.getChatThreads() }, "getChatThreads")
-
-    // Video endpoints
     suspend fun createVideo(video: Video): Video? = handleResponse({ apiService.createVideo(video) }, "createVideo")
     suspend fun getVideos(): List<Video>? = handleResponse({ apiService.getVideos() }, "getVideos")
-
-    // Analysis endpoints
     suspend fun createAnalysis(analysis: Analysis): Analysis? = handleResponse({ apiService.createAnalysis(analysis) }, "createAnalysis")
     suspend fun getAnalyses(): List<Analysis>? = handleResponse({ apiService.getAnalyses() }, "getAnalyses")
     suspend fun getAnalysis(id: Int): Analysis? = handleResponse({ apiService.getAnalysis(id) }, "getAnalysis")
@@ -132,7 +134,6 @@ class SwimmingRepository(private val apiService: ApiService) {
         comment: RequestBody,
         video: MultipartBody.Part
     ): Analysis? = handleResponse({ apiService.uploadSingleAnalysis(date, playerId, comment, video) }, "uploadSingleAnalysis")
-
     suspend fun getAnalysisJson(url: String): String? {
         return try {
             val response = apiService.getAnalysisJson(url)
@@ -149,8 +150,6 @@ class SwimmingRepository(private val apiService: ApiService) {
             throw ApiException("分析JSONの取得中に例外が発生しました: ${e.message}")
         }
     }
-
-    // Attachment endpoints
     suspend fun createAttachment(attachment: Attachment): Attachment? = handleResponse({ apiService.createAttachment(attachment) }, "createAttachment")
     suspend fun getAttachments(): List<Attachment>? = handleResponse({ apiService.getAttachments() }, "getAttachments")
 }
