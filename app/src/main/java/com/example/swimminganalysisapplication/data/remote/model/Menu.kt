@@ -3,30 +3,47 @@ package com.example.swimminganalysisapplication.data.remote.model
 import com.google.gson.annotations.SerializedName
 
 data class Menu(
-    @SerializedName("menu_id")
+    // ★★★ ここから修正 ★★★
+    // @SerializedName の値を、APIが返すJSONのキー名（キャメルケース）に合わせる
+    @SerializedName("menuId")
     val menuId: Int,
-    @SerializedName("menu_org_id")
+
+    @SerializedName("menuOrgId")
     val menuOrgId: Int?,
-    @SerializedName("menu_title")
-    val menuTitle: String,
-    @SerializedName("menu_description")
+
+    // クラッシュ防止のため、nullを許容する型に変更
+    @SerializedName("menuTitle")
+    val menuTitle: String?,
+
+    @SerializedName("menuDescription")
     val menuDescription: String?,
-    @SerializedName("menu_is_public")
+
+    @SerializedName("menuIsPublic")
     val menuIsPublic: Boolean,
-    @SerializedName("menu_is_forked")
+
+    @SerializedName("menuIsForked")
     val menuIsForked: Boolean,
-    @SerializedName("menu_forked_from_menu_id")
+
+    @SerializedName("menuForkedFromMenuId")
     val menuForkedFromMenuId: Int?,
-    @SerializedName("menu_version")
+
+    @SerializedName("menuVersion")
     val menuVersion: Int,
-    @SerializedName("menu_create_at")
+
+    @SerializedName("menuCreateAt")
     val menuCreateAt: String,
-    @SerializedName("menu_update_at")
+
+    @SerializedName("menuUpdateAt")
     val menuUpdateAt: String,
-    @SerializedName("user_id")
+
+    @SerializedName("userId")
     val userId: Int,
-    @SerializedName("player_id")
+
+    @SerializedName("playerId")
     val playerId: Int?,
+
+    // この項目はJSONレスポンスに含まれていないため、変更しない
     @SerializedName("menu_tag_id")
     val menuTagId: Int?
+    // ★★★ ここまで修正 ★★★
 )

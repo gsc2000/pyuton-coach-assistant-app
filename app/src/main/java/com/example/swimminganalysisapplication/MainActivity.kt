@@ -42,6 +42,7 @@ import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMen
 import com.example.swimminganalysisapplication.ui.practicemenu.DiscoverScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.FavoritesScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListViewModelFactory
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
 import com.example.swimminganalysisapplication.ui.video.StartPositionSettingScreen
 import com.example.swimminganalysisapplication.ui.video.VideoScreen
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
     private val loginViewModelFactory: LoginViewModelFactory by lazy { LoginViewModelFactory(swimmingRepository, userPreferences) }
     private val playerViewModelFactory: PlayerViewModelFactory by lazy { PlayerViewModelFactory(swimmingRepository) }
     private val singleAnalysisSetupViewModelFactory: SingleAnalysisSetupViewModelFactory by lazy { SingleAnalysisSetupViewModelFactory(swimmingRepository) }
+    private val practiceListViewModelFactory: PracticeListViewModelFactory by lazy { PracticeListViewModelFactory(swimmingRepository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -72,8 +74,8 @@ class MainActivity : ComponentActivity() {
                         startDestination = AppDestinations.LOGIN_SCREEN_ROUTE
                     ) {
                         composable(
-                            route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE, //例: "menu_comments/{menuId}"
-                            arguments = listOf(navArgument("menuId") { type = NavType.StringType }) // NavType.StringType に変更
+                            route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE,
+                            arguments = listOf(navArgument("menuId") { type = NavType.StringType })
                         ) { backStackEntry ->
                             val menuIdString = backStackEntry.arguments?.getString("menuId")
 
@@ -135,19 +137,28 @@ class MainActivity : ComponentActivity() {
                         composable(AppDestinations.DISCOVER_SCREEN_ROUTE) {
                             DiscoverScreen(navController = navController)
                         }
+                        // ★★★ ここから修正 ★★★
                         composable(
-                            route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE,
-                            arguments = listOf(navArgument("menuId") { type = NavType.StringType; nullable = true })
+                            route = "${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId={menuId}",
+                            arguments = listOf(navArgument("menuId") {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            })
                         ) { backStackEntry ->
                             val menuId = backStackEntry.arguments?.getString("menuId")
                             CreatePracticeMenuScreen(
                                 navController = navController,
-                                practiceMenuId = menuId,
+                                menuId = menuId, // 引数名を `practiceMenuId` から `menuId` に修正
                                 viewModel = viewModel(factory = createPracticeMenuViewModelFactory)
                             )
                         }
+                        // ★★★ ここまで修正 ★★★
                         composable(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
-                            PracticeListScreen(navController = navController)
+                            PracticeListScreen(
+                                navController = navController,
+                                viewModel = viewModel(factory = practiceListViewModelFactory)
+                            )
                         }
                         composable(AppDestinations.FAVORITES_SCREEN_ROUTE) {
                             FavoritesScreen(navController = navController)
@@ -158,7 +169,6 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel(factory = playerViewModelFactory)
                             )
                         }
-
                         composable(
                             route = "${AppDestinations.PLAYER_EDIT_SCREEN_ROUTE}/{playerId}",
                             arguments = listOf(navArgument("playerId") { type = NavType.StringType; nullable = true })
@@ -189,7 +199,6 @@ class MainActivity : ComponentActivity() {
                                 navController = navController
                             )
                         }
-                        // ★★★★★★★★★★ ここから修正 ★★★★★★★★★★
                         composable(
                             route = "${AppDestinations.ANALYSIS_PROGRESS_ROUTE}/{analysisId}",
                             arguments = listOf(navArgument("analysisId") { type = NavType.IntType })
@@ -206,7 +215,6 @@ class MainActivity : ComponentActivity() {
                                 navController.popBackStack()
                             }
                         }
-                        // ★★★★★★★★★★ ここまで修正 ★★★★★★★★★★
                         composable(
                             route = "${AppDestinations.SINGLE_ANALYSIS_RESULT_ROUTE}/{analysisId}",
                             arguments = listOf(navArgument("analysisId") { type = NavType.IntType })

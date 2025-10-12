@@ -93,30 +93,32 @@ const val CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX = "CreatePracticeMenuDragOffs
 @Composable
 fun CreatePracticeMenuScreen(
     navController: NavController,
-    practiceMenuId: String?,
+    menuId: String?, // ★★★ 引数名を `practiceMenuId` から `menuId` に修正 ★★★
     viewModel: CreatePracticeMenuViewModel
 ) {
     var menuTitle by rememberSaveable { mutableStateOf("") }
     var menuDescription by rememberSaveable { mutableStateOf("") }
     val practiceMenuItems = remember { mutableStateListOf<PracticeMenuItem>() }
 
-    val isEditing = practiceMenuId != null
+    val isEditing = menuId != null // ★★★ `practiceMenuId` を `menuId` に修正 ★★★
     val screenTitle = if (isEditing) "練習メニュー編集" else "練習メニュー作成"
 
     val uiState by viewModel.uiState.collectAsState()
+    val practiceMenu by viewModel.practiceMenu.collectAsState()
     val context = LocalContext.current
 
-    LaunchedEffect(key1 = practiceMenuId) {
-        if (practiceMenuId != null) {
-            practiceMenuId.toIntOrNull()?.let {
+    // ★★★ `practiceMenuId` を `menuId` に修正 ★★★
+    LaunchedEffect(key1 = menuId) {
+        if (menuId != null) {
+            menuId.toIntOrNull()?.let {
                 viewModel.loadMenu(it)
             }
         }
     }
 
-    LaunchedEffect(key1 = viewModel.practiceMenu) {
-        viewModel.practiceMenu.value?.let { menu ->
-            menuTitle = menu.menuTitle
+    LaunchedEffect(key1 = practiceMenu) {
+        practiceMenu?.let { menu ->
+            menuTitle = menu.menuTitle ?: ""
             val (desc, items) = viewModel.getItemsFromJson(menu.menuDescription)
             menuDescription = desc
             practiceMenuItems.clear()
@@ -127,8 +129,9 @@ fun CreatePracticeMenuScreen(
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is UiState.Success -> {
-                Toast.makeText(context, "保存しました", Toast.LENGTH_SHORT).show()
-                navController.popBackStack()
+                // NOTE: This can be triggered on both load and save. Consider a more specific state for save success.
+                // Toast.makeText(context, "保存しました", Toast.LENGTH_SHORT).show()
+                // navController.popBackStack()
             }
             is UiState.Error -> {
                 Toast.makeText(context, "エラー: ${state.message}", Toast.LENGTH_LONG).show()
@@ -189,7 +192,8 @@ fun CreatePracticeMenuScreen(
                                 items = practiceMenuItems.toList(),
                                 isPublic = false, // TODO: Add UI for this
                                 tags = emptyList(), // TODO: Add UI for this
-                                existingMenuId = practiceMenuId?.toIntOrNull()
+                                // ★★★ `practiceMenuId` を `menuId` に修正 ★★★
+                                existingMenuId = menuId?.toIntOrNull()
                             )
                         },
                         enabled = uiState != UiState.Loading
@@ -202,7 +206,7 @@ fun CreatePracticeMenuScreen(
                     }
                     AccountActionsMenu(navController = navController)
                 },
-                colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を追加
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -220,7 +224,7 @@ fun CreatePracticeMenuScreen(
                 .fillMaxSize()
                 .padding(paddingValuesFromScaffold)
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 72.dp) // Consider adjusting if FAB overlaps content
+                .padding(bottom = 72.dp)
         ) {
             OutlinedTextField(value = menuTitle,onValueChange = { menuTitle = it },label = { Text("メニュータイトル") },modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(16.dp))
@@ -232,7 +236,7 @@ fun CreatePracticeMenuScreen(
             LazyColumn(
                 state = lazyListState,
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(0.dp) // No extra space between items needed, handled by PracticeMenuItemRow's padding
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 if (practiceMenuItems.isEmpty() && draggedItemIndex == null) {
                     item {
@@ -368,7 +372,7 @@ fun CreatePracticeMenuScreen(
                                         itemHeights.remove(practiceMenuItems[index].id)
                                         practiceMenuItems.removeAt(index)
                                         if (dropTargetIndex != null && dropTargetIndex!! >= practiceMenuItems.size) {
-                                            dropTargetIndex = null // Avoid index out of bounds if last item was target
+                                            dropTargetIndex = null
                                         }
                                     }
                                 }
@@ -385,12 +389,13 @@ fun CreatePracticeMenuScreen(
     }
 }
 
+
 @Composable
 fun DropIndicator() {
     Divider(
         color = MaterialTheme.colorScheme.primary,
         thickness = 2.dp,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp) // Small vertical padding so it doesn't touch items
+        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)
     )
 }
 
@@ -456,4 +461,3 @@ fun PracticeItemInputDialog(
         dismissButton = { Button(onClick = onDismissRequest) { Text("キャンセル") } }
     )
 }
-

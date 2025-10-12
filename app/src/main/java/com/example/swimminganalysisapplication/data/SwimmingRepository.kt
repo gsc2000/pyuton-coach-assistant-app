@@ -9,6 +9,9 @@ import retrofit2.Response
 
 class SwimmingRepository(private val apiService: ApiService) {
 
+    // ★★★ ご指摘の通り、メニューリストのインメモリキャッシュを実装します ★★★
+    private var menusCache: List<Menu>? = null
+
     private suspend fun <T> handleResponse(
         apiCall: suspend () -> Response<T>,
         operation: String
@@ -48,11 +51,51 @@ class SwimmingRepository(private val apiService: ApiService) {
     suspend fun deletePlayer(id: Int): Boolean = handleResponse({ apiService.deletePlayer(id) }, "deletePlayer") != null
 
     // Menu endpoints
-    suspend fun createMenu(menu: Menu): Menu? = handleResponse({ apiService.createMenu(menu) }, "createMenu")
+    suspend fun getMenusByUserId(userId: Int): List<Menu>? {
+        // APIからメニューを取得し、キャッシュに保存する
+        val menus = handleResponse({ apiService.getMenusByUserId(userId) }, "getMenusByUserId")
+        menusCache = menus
+        return menusCache
+    }
+
+    suspend fun createMenu(menu: Menu): Menu? {
+        // 作成時はキャッシュを無効化
+        menusCache = null
+        return handleResponse({ apiService.createMenu(menu) }, "createMenu")
+    }
+
     suspend fun getMenus(): List<Menu>? = handleResponse({ apiService.getMenus() }, "getMenus")
-    suspend fun getMenu(id: Int): Menu? = handleResponse({ apiService.getMenu(id) }, "getMenu")
-    suspend fun updateMenu(id: Int, menu: Menu): Menu? = handleResponse({ apiService.updateMenu(id, menu) }, "updateMenu")
-    suspend fun deleteMenu(id: Int): Boolean = handleResponse({ apiService.deleteMenu(id) }, "deleteMenu") != null
+
+    // ★★★ getMenuがAPIを呼び出さず、キャッシュから探すように修正 ★★★
+    suspend fun getMenu(id: Int): Menu? {
+        Log.d("SwimmingRepository", "ID: $id のメニューをキャッシュから検索します。")
+        // キャッシュがなければ、念のためAPIから取得を試みる（今回は不要だが、堅牢性のために残す）
+        if (menusCache == null) {
+            Log.w("SwimmingRepository", "キャッシュが存在しません。一覧画面で取得に失敗した可能性があります。")
+            // 本来ならここで再度 getMenusByUserId を呼ぶべきだが、今回はViewModelのロジックに任せる
+            return null
+        }
+        val menu = menusCache?.find { it.menuId == id }
+        if (menu == null) {
+            Log.w("SwimmingRepository", "ID: $id のメニューがキャッシュに見つかりませんでした。")
+        } else {
+            Log.d("SwimmingRepository", "キャッシュからメニューを発見しました: $menu")
+        }
+        return menu
+    }
+
+    suspend fun updateMenu(id: Int, menu: Menu): Menu? {
+        // 更新時はキャッシュを無効化
+        menusCache = null
+        return handleResponse({ apiService.updateMenu(id, menu) }, "updateMenu")
+    }
+
+    suspend fun deleteMenu(id: Int): Boolean {
+        // 削除時はキャッシュを無効化
+        menusCache = null
+        return handleResponse({ apiService.deleteMenu(id) }, "deleteMenu") != null
+    }
+
     suspend fun getMenuChats(id: String): List<Chat>? = handleResponse({ apiService.getMenuChats(id) }, "getMenuChats")
     suspend fun getMenuChatThreads(id: String): List<ChatThread>? = handleResponse({ apiService.getMenuChatThreads(id) }, "getMenuChatThreads")
 

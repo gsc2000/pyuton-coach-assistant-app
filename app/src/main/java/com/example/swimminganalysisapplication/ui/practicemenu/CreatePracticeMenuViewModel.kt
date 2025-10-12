@@ -1,5 +1,6 @@
 package com.example.swimminganalysisapplication.ui.practicemenu
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,6 +26,8 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
             _uiState.value = UiState.Loading
             try {
                 val menu = repository.getMenu(menuId)
+                // ★★★ ここにログを追加 ★★★
+                Log.d("DEBUG_MENU", "Loaded menu from repository: $menu")
                 _practiceMenu.value = menu
                 _uiState.value = UiState.Success
             } catch (e: Exception) {
@@ -78,6 +81,8 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                     )
                     repository.createMenu(newMenu)
                 }
+                // ★★★ 成功時のUI State更新を修正 ★★★
+                // UiState.Success を object に変更したため、引数なしで呼び出す
                 _uiState.value = UiState.Success
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to save menu")
@@ -91,7 +96,7 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
         val parts = description.split(separator)
         val mainDescription = parts.getOrNull(0)?.trim() ?: ""
         val json = parts.getOrNull(1)?.trim()
-        
+
         return if (json != null) {
             try {
                 val type = object : TypeToken<List<PracticeMenuItem>>() {}.type

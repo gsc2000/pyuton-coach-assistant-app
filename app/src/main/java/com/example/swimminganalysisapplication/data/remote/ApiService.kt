@@ -46,6 +46,11 @@ interface ApiService {
     suspend fun deletePlayer(@Path("id") id: Int): Response<Unit>
 
     // Menu endpoints
+    // ★★★ ここから追記 ★★★
+    @GET("/api/v1/menus/user/{user_id}")
+    suspend fun getMenusByUserId(@Path("user_id") userId: Int): Response<List<Menu>>
+    // ★★★ ここまで追記 ★★★
+
     @POST("menus/")
     suspend fun createMenu(@Body menu: Menu): Response<Menu>
 
