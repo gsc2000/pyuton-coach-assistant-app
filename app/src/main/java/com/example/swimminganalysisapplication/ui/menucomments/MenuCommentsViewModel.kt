@@ -11,9 +11,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class DisplayThread(
+/**
+ * UIでスレッドを表示するためのデータクラス。
+ * @param parent 親コメント
+ * @param replies 返信コメントのリスト
+ * @param isExpanded スレッドが展開されているかどうかの状態
+ */
+data class CommentThread(
     val parent: Chat,
-    val replies: List<Chat>
+    val replies: List<Chat>,
+    val isExpanded: Boolean = false
 )
 
 class MenuCommentsViewModel(
@@ -21,8 +28,9 @@ class MenuCommentsViewModel(
     private val menuId: String
 ) : ViewModel() {
 
-    private val _threads = MutableStateFlow<List<DisplayThread>>(emptyList())
-    val threads: StateFlow<List<DisplayThread>> = _threads.asStateFlow()
+    // UIに公開する状態をCommentThreadのリストに変更
+    private val _commentThreads = MutableStateFlow<List<CommentThread>>(emptyList())
+    val commentThreads: StateFlow<List<CommentThread>> = _commentThreads.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -44,43 +52,39 @@ class MenuCommentsViewModel(
             _error.value = null
             Log.d(TAG, "loadComments started for menuId: $menuId")
             try {
+                // 現在の展開状態を保持する
+                val oldExpansionState = _commentThreads.value.associateBy(
+                    keySelector = { it.parent.chatId },
+                    valueTransform = { it.isExpanded }
+                )
+
                 val chatsForMenu = repository.getMenuChats(menuId) ?: emptyList()
                 Log.d(TAG, "repository.getMenuChats returned ${chatsForMenu.size} chats.")
-                Log.d(TAG, "Raw chatsForMenu: $chatsForMenu")
-
 
                 val parentChats = chatsForMenu.filter { it.chatThreadId == null }
-                val repliesByThreadId = chatsForMenu.filter { it.chatThreadId != null }.groupBy { it.chatThreadId!! }
+                val repliesByThreadId = chatsForMenu.filter { it.chatThreadId != null }
+                    .groupBy { it.chatThreadId!! }
+                Log.d(
+                    TAG,
+                    "Found ${parentChats.size} parent chats and ${repliesByThreadId.size} groups of replies."
+                )
 
-                Log.d(TAG, "Found ${parentChats.size} parent chats.")
-                Log.d(TAG, "Found ${repliesByThreadId.size} groups of replies.")
+                // グルーピングロジックを修正
+                // 親コメントが見つかった場合のみスレッドを構築するシンプルなロジックに変更。
+                val newThreads = parentChats.map { parent ->
+                    val replies = repliesByThreadId[parent.chatId] ?: emptyList()
+                    // 以前の展開状態を復元する
+                    val wasExpanded = oldExpansionState[parent.chatId] ?: false
+                    CommentThread(
+                        parent = parent,
+                        replies = replies.sortedBy { it.chatSentAt },
+                        isExpanded = wasExpanded // 状態を適用
+                    )
+                }.sortedByDescending { it.parent.chatSentAt }
 
-                val displayThreads: List<DisplayThread>
 
-                // A. 親コメントが存在する場合 (Happy Path)
-                if (parentChats.isNotEmpty()) {
-                    Log.d(TAG, "Processing Happy Path (A)")
-                    displayThreads = parentChats.map { parent ->
-                        val replies = repliesByThreadId[parent.chatId] ?: emptyList()
-                        DisplayThread(parent = parent, replies = replies.sortedBy { it.chatSentAt })
-                    }.sortedByDescending { it.parent.chatSentAt }
-                }
-                // B. 親コメントは無いが、何らかのコメント（返信のみ）は存在する場合 (Fallback)
-                else if (chatsForMenu.isNotEmpty()) {
-                    Log.d(TAG, "Processing Fallback Path (B)")
-                    // 全てのコメントを「返信のない親コメント」として表示する
-                    displayThreads = chatsForMenu.map { chat ->
-                        DisplayThread(parent = chat, replies = emptyList())
-                    }.sortedByDescending { it.parent.chatSentAt }
-                }
-                // C. コメントが一つも無い場合
-                else {
-                    Log.d(TAG, "Processing No Comments Path (C)")
-                    displayThreads = emptyList()
-                }
-
-                Log.d(TAG, "Final displayThreads count: ${displayThreads.size}")
-                _threads.value = displayThreads
+                Log.d(TAG, "Final commentThreads count: ${newThreads.size}")
+                _commentThreads.value = newThreads
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading comments", e)
@@ -90,6 +94,23 @@ class MenuCommentsViewModel(
                 Log.d(TAG, "loadComments finished.")
             }
         }
+    }
+
+    /**
+     * 指定された親コメントIDのスレッド展開状態を切り替える。
+     * UI（親コメントのタップイベント）から呼び出す。
+     */
+    fun toggleThreadExpansion(parentChatId: Int) {
+        Log.d(TAG, "Toggling expansion for thread with parent ID: $parentChatId")
+        val currentThreads = _commentThreads.value
+        val newThreads = currentThreads.map { thread ->
+            if (thread.parent.chatId == parentChatId) {
+                thread.copy(isExpanded = !thread.isExpanded)
+            } else {
+                thread
+            }
+        }
+        _commentThreads.value = newThreads
     }
 
     fun postComment(content: String, parentChatId: Int?) {
@@ -114,7 +135,7 @@ class MenuCommentsViewModel(
                 val createdChat = repository.createChat(newChatRequest)
 
                 if (createdChat != null) {
-                    // 投稿成功後、リストを再読み込み
+                    // 投稿成功後、リストを再読み込みして最新の状態を反映する
                     loadComments()
                 } else {
                     _error.value = "投稿に失敗しました。"

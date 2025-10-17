@@ -2,6 +2,7 @@ package com.example.swimminganalysisapplication.data.remote // パッケージ�
 
 import android.content.Context
 import com.example.swimminganalysisapplication.data.storage.UserPreferences
+import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -34,20 +35,25 @@ object RetrofitClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY // リクエスト/レスポンスの詳細をログ出力
         }
+
         val okHttpClient = OkHttpClient.Builder()
-            .addInterceptor(authInterceptor) // 認証インターセプター
-            .addInterceptor(loggingInterceptor) // ログ出力インターセプター
+            .addInterceptor(loggingInterceptor) // 最初にログ出力
+            .addInterceptor(authInterceptor)    // 次に認証処理
             .connectTimeout(30, TimeUnit.SECONDS) // 接続タイムアウト
             .readTimeout(30, TimeUnit.SECONDS)    // 読み取りタイムアウト
             .writeTimeout(30, TimeUnit.SECONDS)   // 書き込みタイムアウト
             .build()
+        
+        // ★★★ null値もJSONに含めるようにGsonをカスタム ★★★
+        val gson = GsonBuilder()
+            .serializeNulls()
+            .create()
 
         // Retrofitビルダー
         return Retrofit.Builder()
             .baseUrl(BASE_URL) // 現在は開発用URLが使用される
             .client(okHttpClient) // カスタムOkHttpクライアントを設定
-            .addConverterFactory(GsonConverterFactory.create()) // JSONコンバータ (Gson)
-            // .addConverterFactory(ScalarsConverterFactory.create()) // もしレスポンスが本当にプレーンな文字列の場合、こちらが必要になることも
+            .addConverterFactory(GsonConverterFactory.create(gson)) // ★カスタムGsonを使用
             .build()
     }
 }
