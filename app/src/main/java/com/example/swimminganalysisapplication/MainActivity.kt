@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
 
                             if (menuIdString != null) {
                                 Log.d("MainActivity", "NavHost: Navigated to menu_comments with menuId (String): $menuIdString")
-                                val factory = MenuCommentsViewModelFactory(swimmingRepository, userPreferences, menuIdString)
+                                val factory = MenuCommentsViewModelFactory(swimmingRepository, menuIdString)
                                 MenuCommentsScreen(
                                     navController = navController,
                                     viewModel = viewModel(factory = factory)
@@ -137,7 +137,6 @@ class MainActivity : ComponentActivity() {
                         composable(AppDestinations.DISCOVER_SCREEN_ROUTE) {
                             DiscoverScreen(navController = navController)
                         }
-                        // ★★★ ここから修正 ★★★
                         composable(
                             route = "${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId={menuId}",
                             arguments = listOf(navArgument("menuId") {
@@ -149,11 +148,10 @@ class MainActivity : ComponentActivity() {
                             val menuId = backStackEntry.arguments?.getString("menuId")
                             CreatePracticeMenuScreen(
                                 navController = navController,
-                                menuId = menuId, // 引数名を `practiceMenuId` から `menuId` に修正
+                                menuId = menuId, // ★★★ 不要な toIntOrNull() を削除 ★★★
                                 viewModel = viewModel(factory = createPracticeMenuViewModelFactory)
                             )
                         }
-                        // ★★★ ここまで修正 ★★★
                         composable(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
                             PracticeListScreen(
                                 navController = navController,

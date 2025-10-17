@@ -1,18 +1,16 @@
 package com.example.swimminganalysisapplication.ui.menucomments
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.model.Chat
-import com.example.swimminganalysisapplication.data.remote.model.ChatThread
-import com.example.swimminganalysisapplication.data.storage.UserPreferences
+import com.example.swimminganalysisapplication.data.remote.model.ChatCreate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
-// UIでスレッド形式のコメントを表示するためのデータクラス
 data class DisplayThread(
     val parent: Chat,
     val replies: List<Chat>
@@ -20,8 +18,7 @@ data class DisplayThread(
 
 class MenuCommentsViewModel(
     private val repository: SwimmingRepository,
-    private val userPreferences: UserPreferences,
-    private val menuId: String // ★ Int から String に変更
+    private val menuId: String
 ) : ViewModel() {
 
     private val _threads = MutableStateFlow<List<DisplayThread>>(emptyList())
@@ -33,6 +30,10 @@ class MenuCommentsViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    companion object {
+        private const val TAG = "MenuCommentsViewModel"
+    }
+
     init {
         loadComments()
     }
@@ -41,108 +42,88 @@ class MenuCommentsViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
+            Log.d(TAG, "loadComments started for menuId: $menuId")
             try {
-                // repository の関数が String 型の menuId を受け付けるか確認が必要
-                val chatThreads = repository.getMenuChatThreads(menuId) ?: emptyList() // menuId を String で渡す
-                val allChats = repository.getMenuChats(menuId) ?: emptyList()       // menuId を String で渡す
+                val chatsForMenu = repository.getMenuChats(menuId) ?: emptyList()
+                Log.d(TAG, "repository.getMenuChats returned ${chatsForMenu.size} chats.")
+                Log.d(TAG, "Raw chatsForMenu: $chatsForMenu")
 
-                if (chatThreads.isNotEmpty() && allChats.isNotEmpty()) {
-                    val chatsByThreadId = allChats.groupBy { it.chatThreadId }
 
-                    val displayThreads = chatThreads.mapNotNull { thread ->
-                        val parentChat = allChats.find { it.chatId == thread.chatId }
-                        val replies = chatsByThreadId[thread.chatThreadId]
-                            ?.filter { it.chatId != thread.chatId }
-                            ?: emptyList()
+                val parentChats = chatsForMenu.filter { it.chatThreadId == null }
+                val repliesByThreadId = chatsForMenu.filter { it.chatThreadId != null }.groupBy { it.chatThreadId!! }
 
-                        parentChat?.let {
-                            DisplayThread(parent = it, replies = replies.sortedBy { r -> r.chatSentAt })
-                        }
+                Log.d(TAG, "Found ${parentChats.size} parent chats.")
+                Log.d(TAG, "Found ${repliesByThreadId.size} groups of replies.")
+
+                val displayThreads: List<DisplayThread>
+
+                // A. 親コメントが存在する場合 (Happy Path)
+                if (parentChats.isNotEmpty()) {
+                    Log.d(TAG, "Processing Happy Path (A)")
+                    displayThreads = parentChats.map { parent ->
+                        val replies = repliesByThreadId[parent.chatId] ?: emptyList()
+                        DisplayThread(parent = parent, replies = replies.sortedBy { it.chatSentAt })
                     }.sortedByDescending { it.parent.chatSentAt }
-
-                    _threads.value = displayThreads
-                } else {
-                    _threads.value = emptyList()
+                }
+                // B. 親コメントは無いが、何らかのコメント（返信のみ）は存在する場合 (Fallback)
+                else if (chatsForMenu.isNotEmpty()) {
+                    Log.d(TAG, "Processing Fallback Path (B)")
+                    // 全てのコメントを「返信のない親コメント」として表示する
+                    displayThreads = chatsForMenu.map { chat ->
+                        DisplayThread(parent = chat, replies = emptyList())
+                    }.sortedByDescending { it.parent.chatSentAt }
+                }
+                // C. コメントが一つも無い場合
+                else {
+                    Log.d(TAG, "Processing No Comments Path (C)")
+                    displayThreads = emptyList()
                 }
 
+                Log.d(TAG, "Final displayThreads count: ${displayThreads.size}")
+                _threads.value = displayThreads
+
             } catch (e: Exception) {
+                Log.e(TAG, "Error loading comments", e)
                 _error.value = "コメントの読み込みに失敗しました: ${e.message}"
             } finally {
                 _isLoading.value = false
+                Log.d(TAG, "loadComments finished.")
             }
         }
     }
 
-    // postNewThread と postReply 内の threadId (Int) の扱いは、
-    // Chat データクラスや API の仕様に依存するため、ここでは変更していません。
-    // menuId が String になったことで、これらのメソッドに直接影響はないはずです。
-
-    fun postNewThread(content: String) {
+    fun postComment(content: String, parentChatId: Int?) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
             try {
-                val currentUserId = userPreferences.userId.firstOrNull()
-                if (currentUserId == null) {
-                    _error.value = "ユーザー情報が取得できませんでした。"
+                val currentUser = repository.getMe()
+                if (currentUser == null) {
+                    _error.value = "ユーザー情報が取得できません。再度ログインしてください。"
                     _isLoading.value = false
                     return@launch
                 }
 
-                val newChatRequest = Chat(
-                    chatId = 0,
+                val newChatRequest = ChatCreate(
                     chatContent = content,
-                    chatSentAt = "",
-                    chatThreadId = null,
-                    userId = currentUserId
+                    userId = currentUser.userId,
+                    menuId = menuId.toIntOrNull(),
+                    chatThreadId = parentChatId
                 )
-                val newChat = repository.createChat(newChatRequest)
 
-                if (newChat != null) {
-                    val newChatThreadRequest = ChatThread(
-                        chatThreadId = 0,
-                        chatThreadTitle = null,
-                        chatThreadCreateAt = "",
-                        chatId = newChat.chatId
-                        // menuId を ChatThread に含めるかはAPI仕様による
-                    )
-                    repository.createChatThread(newChatThreadRequest)
+                val createdChat = repository.createChat(newChatRequest)
+
+                if (createdChat != null) {
+                    // 投稿成功後、リストを再読み込み
                     loadComments()
                 } else {
-                    _error.value = "スレッドの作成に失敗しました。"
+                    _error.value = "投稿に失敗しました。"
                 }
-            } catch (e: Exception) {
-                _error.value = "投稿に失敗しました: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
 
-    fun postReply(threadId: Int, content: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-            try {
-                val currentUserId = userPreferences.userId.firstOrNull()
-                if (currentUserId == null) {
-                    _error.value = "ユーザー情報が取得できませんでした。"
-                    _isLoading.value = false
-                    return@launch
-                }
-                val newChatRequest = Chat(
-                    chatId = 0,
-                    chatContent = content,
-                    chatSentAt = "",
-                    chatThreadId = threadId,
-                    userId = currentUserId
-                )
-                repository.createChat(newChatRequest)
-                loadComments()
             } catch (e: Exception) {
-                _error.value = "返信に失敗しました: ${e.message}"
+                _error.value = "投稿中にエラーが発生しました: ${e.message}"
             } finally {
-                _isLoading.value = false
+                // isLoadingはloadComments()のfinallyでfalseにされる
             }
         }
     }

@@ -61,7 +61,6 @@ class SwimmingRepository(private val apiService: ApiService) {
 
     suspend fun createMenu(menu: Menu): Menu? {
         val createdMenu = handleResponse({ apiService.createMenu(menu) }, "createMenu")
-        // 作成成功後、キャッシュに新しいメニューを追加
         if (createdMenu != null) {
             menusCache = menusCache?.plus(createdMenu)
             Log.d("SwimmingRepository", "Added new menu to cache.")
@@ -69,10 +68,8 @@ class SwimmingRepository(private val apiService: ApiService) {
         return createdMenu
     }
 
-    // This method seems unused, but we'll leave it as is.
     suspend fun getMenus(): List<Menu>? = handleResponse({ apiService.getMenus() }, "getMenus")
 
-    // キャッシュから単一のメニューを取得
     suspend fun getMenu(id: Int): Menu? {
         Log.d("SwimmingRepository", "Attempting to get menu with id $id from cache.")
         if (menusCache == null) {
@@ -90,7 +87,6 @@ class SwimmingRepository(private val apiService: ApiService) {
 
     suspend fun updateMenu(id: Int, menu: Menu): Menu? {
         val updatedMenu = handleResponse({ apiService.updateMenu(id, menu) }, "updateMenu")
-        // 更新成功後、キャッシュ内の該当メニューを置き換え
         if (updatedMenu != null) {
             menusCache = menusCache?.map {
                 if (it.menuId == id) updatedMenu else it
@@ -102,7 +98,6 @@ class SwimmingRepository(private val apiService: ApiService) {
 
     suspend fun deleteMenu(id: Int): Boolean {
         val success = handleResponse({ apiService.deleteMenu(id) }, "deleteMenu") != null
-        // 削除成功後、キャッシュから該当メニューを削除
         if (success) {
             menusCache = menusCache?.filterNot { it.menuId == id }
             Log.d("SwimmingRepository", "Deleted menu from cache.")
@@ -110,14 +105,27 @@ class SwimmingRepository(private val apiService: ApiService) {
         return success
     }
 
-    // --- Other Endpoints ---
+    // --- Chat & Other Endpoints ---
 
-    suspend fun getMenuChats(id: String): List<Chat>? = handleResponse({ apiService.getMenuChats(id) }, "getMenuChats")
+    suspend fun getMenuChats(menuId: String): List<Chat>? {
+        val menuIdInt = menuId.toIntOrNull()
+        if (menuIdInt == null) {
+            Log.e("SwimmingRepository", "Invalid menuId format: $menuId. Cannot filter.")
+            return emptyList()
+        }
+
+        val allChats = handleResponse({ apiService.getChats() }, "getChats")
+
+        // APIのレスポンスに `menu_id` が含まれているという前提でフィルタリングを行う。
+        // APIが `menu_id` を返さない場合、このフィルタは正しく機能しない。
+        return allChats?.filter { it.menuId == menuIdInt }
+    }
+
     suspend fun getMenuChatThreads(id: String): List<ChatThread>? = handleResponse({ apiService.getMenuChatThreads(id) }, "getMenuChatThreads")
     suspend fun createTag(tag: ApiTag): ApiTag? = handleResponse({ apiService.createTag(tag) }, "createTag")
     suspend fun getTags(): List<ApiTag>? = handleResponse({ apiService.getTags() }, "getTags")
     suspend fun createMenuTagRelation(relation: MenuTagRelation): MenuTagRelation? = handleResponse({ apiService.createMenuTagRelation(relation) }, "createMenuTagRelation")
-    suspend fun createChat(chat: Chat): Chat? = handleResponse({ apiService.createChat(chat) }, "createChat")
+    suspend fun createChat(chat: ChatCreate): Chat? = handleResponse({ apiService.createChat(chat) }, "createChat")
     suspend fun getChats(): List<Chat>? = handleResponse({ apiService.getChats() }, "getChats")
     suspend fun createFavorite(favorite: Favorite): Favorite? = handleResponse({ apiService.createFavorite(favorite) }, "createFavorite")
     suspend fun getFavorites(): List<Favorite>? = handleResponse({ apiService.getFavorites() }, "getFavorites")

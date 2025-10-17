@@ -5,7 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send // ★★★ 推奨されているバージョンに修正 ★★★
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,14 +18,13 @@ import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Chat
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MenuCommentsScreen(
     navController: NavController,
-    viewModel: MenuCommentsViewModel = viewModel()
+    viewModel: MenuCommentsViewModel
 ) {
     val threads by viewModel.threads.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -35,7 +34,7 @@ fun MenuCommentsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("コメント") }, // ViewModelからメニュータイトルを取得できればより良い
+                title = { Text("コメント") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
@@ -67,13 +66,14 @@ fun MenuCommentsScreen(
                     IconButton(
                         onClick = {
                             if (newCommentText.isNotBlank()) {
-                                viewModel.postNewThread(newCommentText)
+                                viewModel.postComment(newCommentText, null)
                                 newCommentText = ""
                             }
                         },
-                        enabled = newCommentText.isNotBlank()
+                        enabled = newCommentText.isNotBlank() && !isLoading
                     ) {
-                        Icon(Icons.Filled.Send, contentDescription = "スレッド開始")
+                        // ★★★ 推奨されているバージョンに修正 ★★★
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "スレッド開始")
                     }
                 }
             }
@@ -84,7 +84,7 @@ fun MenuCommentsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (isLoading) {
+            if (isLoading && threads.isEmpty()) { // 初回ロード中のみ全画面インジケーター
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (error != null) {
                 Text(
@@ -106,14 +106,16 @@ fun MenuCommentsScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    reverseLayout = true // 新しいコメントが下に来るように
                 ) {
                     items(threads) { thread ->
                         ThreadItem(
                             parent = thread.parent,
                             replies = thread.replies,
+                            isPosting = isLoading,
                             onReply = { parentChatId, text ->
-                                viewModel.postReply(parentChatId, text)
+                                viewModel.postComment(text, parentChatId)
                             }
                         )
                     }
@@ -127,6 +129,7 @@ fun MenuCommentsScreen(
 fun ThreadItem(
     parent: Chat,
     replies: List<Chat>,
+    isPosting: Boolean,
     onReply: (Int, String) -> Unit
 ) {
     var showReplyInput by remember { mutableStateOf(false) }
@@ -173,14 +176,15 @@ fun ThreadItem(
                     IconButton(
                         onClick = {
                             if (replyText.isNotBlank()) {
-                                onReply(parent.chatThreadId ?: 0, replyText)
+                                onReply(parent.chatId, replyText)
                                 replyText = ""
                                 showReplyInput = false
                             }
                         },
-                        enabled = replyText.isNotBlank()
+                        enabled = replyText.isNotBlank() && !isPosting
                     ) {
-                        Icon(Icons.Filled.Send, contentDescription = "返信を送信")
+                         // ★★★ 推奨されているバージョンに修正 ★★★
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "返信を送信")
                     }
                 }
             }
@@ -197,19 +201,10 @@ fun CommentItem(comment: Chat) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(comment.userId.toString(), style = MaterialTheme.typography.titleSmall) // Temporarily display user ID
+            // TODO: ViewModelでユーザー名を取得する実装
+            Text("User ${comment.userId}", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = try {
-                    // Parse ISO 8601 format string
-                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.getDefault())
-                    val date = isoFormat.parse(comment.chatSentAt)
-                    // Convert to desired format
-                    val displayFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
-                    date?.let { d -> displayFormat.format(d) } ?: "Unknown Date"
-                } catch (e: Exception) {
-                    // Fallback for parsing error or if chatSentAt is not in the expected format
-                    comment.chatSentAt
-                },
+                text = comment.chatSentAt.toFormattedDateString(),
                 style = MaterialTheme.typography.bodySmall,
                 fontStyle = FontStyle.Italic
             )
@@ -217,4 +212,27 @@ fun CommentItem(comment: Chat) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(comment.chatContent, style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+// 日付文字列をパースしてフォーマットするための拡張関数
+fun String.toFormattedDateString(): String {
+    // 複数の日付フォーマットを試す
+    val possibleFormats = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+        "yyyy-MM-dd'T'HH:mm:ss"
+    )
+    possibleFormats.forEach { format ->
+        try {
+            val parser = SimpleDateFormat(format, Locale.getDefault())
+            val date = parser.parse(this)
+            date?.let {
+                val displayFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
+                return displayFormat.format(it)
+            }
+        } catch (e: Exception) {
+            // パース失敗時は次のフォーマットを試す
+        }
+    }
+    // どのフォーマットにも一致しなかった場合は元の文字列を（少し短くして）返す
+    return this.take(16)
 }

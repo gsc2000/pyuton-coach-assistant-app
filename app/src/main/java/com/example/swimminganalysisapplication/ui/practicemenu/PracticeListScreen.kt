@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Comment // ★ インポートを追加
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Menu
 import com.example.swimminganalysisapplication.navigation.AppDestinations
@@ -71,8 +71,7 @@ fun PracticeListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                // menuIdを渡さずに遷移することで、新規作成モードで開く
-                navController.navigate("${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId=null")
+                navController.navigate("${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId=-1")
             }) {
                 Icon(Icons.Filled.Add, contentDescription = "練習メニューを作成")
             }
@@ -103,8 +102,15 @@ fun PracticeListScreen(
                     items(menus) { menu ->
                         PracticeMenuItem(
                             menu = menu,
-                            onClick = {
+                            onItemClick = {
+                                // カード全体をクリックしたら編集画面へ
                                 navController.navigate("${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId=${menu.menuId}")
+                            },
+                            onCommentClick = {
+                                // コメントアイコンをクリックしたらコメント画面へ
+                                navController.navigate(
+                                    AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE.replace("{menuId}", menu.menuId.toString())
+                                )
                             }
                         )
                     }
@@ -115,20 +121,25 @@ fun PracticeListScreen(
 }
 
 @Composable
-fun PracticeMenuItem(menu: Menu, onClick: () -> Unit) {
+fun PracticeMenuItem(
+    menu: Menu,
+    onItemClick: () -> Unit,
+    onCommentClick: () -> Unit // ★ コメントクリック用のコールバックを追加
+) {
     // 説明文から ---items--- 以降を取り除く
     val displayDescription = menu.menuDescription?.split("---items---")?.getOrNull(0)?.trim() ?: ""
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onItemClick), // カード全体をクリック可能に
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 8.dp), // 右のパディングを調整
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 左側のテキスト部分
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = menu.menuTitle ?: "（無題）",
@@ -136,16 +147,25 @@ fun PracticeMenuItem(menu: Menu, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold
                 )
 
-                // 説明文がある場合のみ表示
                 if (displayDescription.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = displayDescription,
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2, // 長すぎる場合に省略
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // ★★★ 右側のコメントボタン ★★★
+            IconButton(onClick = onCommentClick) {
+                Icon(
+                    imageVector = Icons.Default.Comment,
+                    contentDescription = "コメント",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }

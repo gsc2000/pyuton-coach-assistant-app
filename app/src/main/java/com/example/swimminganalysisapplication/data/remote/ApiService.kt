@@ -65,12 +65,20 @@ interface ApiService {
     suspend fun deleteMenu(@Path("id") id: Int): Response<Unit>
 
 
-    // --- Menu Sub-resources (To be reviewed) ---
+    // --- Chat Endpoints (OpenAPI仕様準拠に修正) ★★★ここから★★★ ---
+    @POST("/api/v1/chats/")
+    suspend fun createChat(@Body chat: ChatCreate): Response<Chat> // ★ ChatCreate を受け取るように修正
+
+    @GET("/api/v1/chats/")
+    suspend fun getChats(): Response<List<Chat>> // ★ パスを修正
+
+    // --- 以下の古い/未使用のエンドポイントは、後方互換性のため残すが、将来的には削除を検討 ---
     @GET("menus/{id}/chats")
     suspend fun getMenuChats(@Path("id") id: String): Response<List<Chat>>
 
     @GET("menus/{id}/chat_threads")
     suspend fun getMenuChatThreads(@Path("id") id: String): Response<List<ChatThread>>
+    // ★★★ここまで★★★
 
     // Tag endpoints
     @POST("tags/")
@@ -83,13 +91,6 @@ interface ApiService {
     @POST("menu_tag_relations/")
     suspend fun createMenuTagRelation(@Body relation: MenuTagRelation): Response<MenuTagRelation>
 
-    // Chat endpoints
-    @POST("chats/")
-    suspend fun createChat(@Body chat: Chat): Response<Chat>
-
-    @GET("chats/")
-    suspend fun getChats(): Response<List<Chat>>
-
     // Favorite endpoints
     @POST("favorites/")
     suspend fun createFavorite(@Body favorite: Favorite): Response<Favorite>
@@ -97,7 +98,7 @@ interface ApiService {
     @GET("favorites/")
     suspend fun getFavorites(): Response<List<Favorite>>
 
-    // ChatThread endpoints
+    // ChatThread endpoints (Now considered obsolete as chatthreadId is part of Chat model)
     @POST("chat_threads/")
     suspend fun createChatThread(@Body chatThread: ChatThread): Response<ChatThread>
 
