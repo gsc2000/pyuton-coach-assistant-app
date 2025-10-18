@@ -28,7 +28,6 @@ class MenuCommentsViewModel(
     private val menuId: String
 ) : ViewModel() {
 
-    // UIに公開する状態をCommentThreadのリストに変更
     private val _commentThreads = MutableStateFlow<List<CommentThread>>(emptyList())
     val commentThreads: StateFlow<List<CommentThread>> = _commentThreads.asStateFlow()
 
@@ -52,7 +51,6 @@ class MenuCommentsViewModel(
             _error.value = null
             Log.d(TAG, "loadComments started for menuId: $menuId")
             try {
-                // 現在の展開状態を保持する
                 val oldExpansionState = _commentThreads.value.associateBy(
                     keySelector = { it.parent.chatId },
                     valueTransform = { it.isExpanded }
@@ -61,27 +59,26 @@ class MenuCommentsViewModel(
                 val chatsForMenu = repository.getMenuChats(menuId) ?: emptyList()
                 Log.d(TAG, "repository.getMenuChats returned ${chatsForMenu.size} chats.")
 
-                val parentChats = chatsForMenu.filter { it.chatThreadId == null }
-                val repliesByThreadId = chatsForMenu.filter { it.chatThreadId != null }
-                    .groupBy { it.chatThreadId!! }
+                // ★★★ ここから修正 ★★★
+                val parentChats = chatsForMenu.filter { it.parentChatId == null }
+                val repliesByThreadId = chatsForMenu.filter { it.parentChatId != null }
+                    .groupBy { it.parentChatId!! }
+                // ★★★ ここまで修正 ★★★
+
                 Log.d(
                     TAG,
                     "Found ${parentChats.size} parent chats and ${repliesByThreadId.size} groups of replies."
                 )
 
-                // グルーピングロジックを修正
-                // 親コメントが見つかった場合のみスレッドを構築するシンプルなロジックに変更。
                 val newThreads = parentChats.map { parent ->
                     val replies = repliesByThreadId[parent.chatId] ?: emptyList()
-                    // 以前の展開状態を復元する
                     val wasExpanded = oldExpansionState[parent.chatId] ?: false
                     CommentThread(
                         parent = parent,
                         replies = replies.sortedBy { it.chatSentAt },
-                        isExpanded = wasExpanded // 状態を適用
+                        isExpanded = wasExpanded
                     )
                 }.sortedByDescending { it.parent.chatSentAt }
-
 
                 Log.d(TAG, "Final commentThreads count: ${newThreads.size}")
                 _commentThreads.value = newThreads
@@ -96,10 +93,6 @@ class MenuCommentsViewModel(
         }
     }
 
-    /**
-     * 指定された親コメントIDのスレッド展開状態を切り替える。
-     * UI（親コメントのタップイベント）から呼び出す。
-     */
     fun toggleThreadExpansion(parentChatId: Int) {
         Log.d(TAG, "Toggling expansion for thread with parent ID: $parentChatId")
         val currentThreads = _commentThreads.value
@@ -125,17 +118,18 @@ class MenuCommentsViewModel(
                     return@launch
                 }
 
+                // ★★★ ここから修正 ★★★
                 val newChatRequest = ChatCreate(
                     chatContent = content,
                     userId = currentUser.userId,
                     menuId = menuId.toIntOrNull(),
-                    chatThreadId = parentChatId
+                    parentChatId = parentChatId
                 )
+                // ★★★ ここまで修正 ★★★
 
                 val createdChat = repository.createChat(newChatRequest)
 
                 if (createdChat != null) {
-                    // 投稿成功後、リストを再読み込みして最新の状態を反映する
                     loadComments()
                 } else {
                     _error.value = "投稿に失敗しました。"
@@ -144,7 +138,7 @@ class MenuCommentsViewModel(
             } catch (e: Exception) {
                 _error.value = "投稿中にエラーが発生しました: ${e.message}"
             } finally {
-                // isLoadingはloadComments()のfinallyでfalseにされる
+                // isLoading is handled in loadComments()
             }
         }
     }
