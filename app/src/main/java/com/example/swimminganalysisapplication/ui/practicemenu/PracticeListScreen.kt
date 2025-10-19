@@ -17,7 +17,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Comment // ★ インポートを追加
+import androidx.compose.material.icons.filled.Comment
+// ★★★ ここから追加 ★★★
+import androidx.compose.material.icons.filled.TravelExplore
+// ★★★ ここまで追加 ★★★
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,6 +65,17 @@ fun PracticeListScreen(
                         Icon(Icons.Filled.ArrowBack, contentDescription = "戻る")
                     }
                 },
+                // ★★★ ここから修正 ★★★
+                actions = {
+                    IconButton(onClick = { navController.navigate(AppDestinations.DISCOVER_SCREEN_ROUTE) }) {
+                        Icon(
+                            imageVector = Icons.Default.TravelExplore,
+                            contentDescription = "他のユーザーのメニューを探す",
+                            tint = Color.White // アイコンの色を戻るボタンと合わせる
+                        )
+                    }
+                },
+                // ★★★ ここまで修正 ★★★
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = Color.White,
@@ -124,7 +138,7 @@ fun PracticeListScreen(
 fun PracticeMenuItem(
     menu: Menu,
     onItemClick: () -> Unit,
-    onCommentClick: () -> Unit // ★ コメントクリック用のコールバックを追加
+    onCommentClick: () -> Unit
 ) {
     // 説明文から ---items--- 以降を取り除く
     val displayDescription = menu.menuDescription?.split("---items---")?.getOrNull(0)?.trim() ?: ""
