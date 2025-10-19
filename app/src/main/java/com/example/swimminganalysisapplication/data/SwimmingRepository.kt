@@ -5,6 +5,7 @@ import com.example.swimminganalysisapplication.data.remote.ApiService
 import com.example.swimminganalysisapplication.data.remote.model.*
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 
 class SwimmingRepository(private val apiService: ApiService) {
@@ -32,22 +33,19 @@ class SwimmingRepository(private val apiService: ApiService) {
         }
     }
 
-    // --- Auth (OpenAPI仕様準拠) ---
+    // --- Auth ---
     suspend fun register(userCreate: UserCreate): User? = handleResponse({ apiService.register(userCreate) }, "register")
     suspend fun login(userLogin: UserLogin): Token? = handleResponse({ apiService.login(userLogin) }, "login")
     suspend fun getMe(): User? = handleResponse({ apiService.getMe() }, "getMe")
 
-    // User endpoints
-    suspend fun getUser(id: Int): User? = handleResponse({ apiService.getUser(id) }, "getUser")
-
-    // Player endpoints
+    // --- Player endpoints ---
     suspend fun createPlayer(player: PlayerCreate): Player? = handleResponse({ apiService.createPlayer(player) }, "createPlayer")
     suspend fun getPlayers(query: String? = null): List<Player>? = handleResponse({ apiService.getPlayers(query) }, "getPlayers")
     suspend fun getPlayer(id: Int): Player? = handleResponse({ apiService.getPlayer(id) }, "getPlayer")
     suspend fun updatePlayer(id: Int, player: Player): Player? = handleResponse({ apiService.updatePlayer(id, player) }, "updatePlayer")
     suspend fun deletePlayer(id: Int): Boolean = handleResponse({ apiService.deletePlayer(id) }, "deletePlayer") != null
 
-    // --- Menu Endpoints with Intelligent Caching ---
+    // --- Menu Endpoints ---
     suspend fun getMenusByUserId(userId: Int, forceRefresh: Boolean = false): List<Menu>? {
         if (menusCache != null && !forceRefresh) {
             Log.d("SwimmingRepository", "Returning menus from cache.")
@@ -68,17 +66,22 @@ class SwimmingRepository(private val apiService: ApiService) {
         return createdMenu
     }
 
-    suspend fun getMenus(): List<Menu>? = handleResponse({ apiService.getMenus() }, "getMenus")
+    suspend fun getPublicMenus(): List<Menu>? {
+        return handleResponse({ apiService.getPublicMenus() }, "getPublicMenus")
+    }
 
     suspend fun getMenu(id: Int): Menu? {
+        // この部分はキャッシュから探すロジックのままにしておく
         Log.d("SwimmingRepository", "Attempting to get menu with id $id from cache.")
         if (menusCache == null) {
             Log.w("SwimmingRepository", "Menu cache is null. Cannot retrieve menu item.")
-            return null
+            // キャッシュがない場合はAPIから取得するフォールバックを追加しても良い
+            return handleResponse({ apiService.getMenu(id) }, "getMenu")
         }
         val menu = menusCache?.find { it.menuId == id }
         if (menu == null) {
-            Log.w("SwimmingRepository", "Menu with id $id not found in cache.")
+            Log.w("SwimmingRepository", "Menu with id $id not found in cache. Fetching from network.")
+            return handleResponse({ apiService.getMenu(id) }, "getMenu")
         } else {
             Log.d("SwimmingRepository", "Found menu in cache: $menu")
         }
@@ -105,8 +108,16 @@ class SwimmingRepository(private val apiService: ApiService) {
         return success
     }
 
-    // --- Chat & Other Endpoints ---
+    suspend fun forkMenu(menuId: Int): Menu? {
+        val forkedMenu = handleResponse({ apiService.forkMenu(menuId) }, "forkMenu")
+        if (forkedMenu != null) {
+            menusCache = null // 自分のメニューキャッシュをクリアし、次回読み込み時に再取得させる
+            Log.d("SwimmingRepository", "Forked menu. Invalidated local cache.")
+        }
+        return forkedMenu
+    }
 
+    // ★★★ [復元] 削除されてしまっていたメソッドを元に戻しました ★★★
     suspend fun getMenuChats(menuId: String): List<Chat>? {
         val menuIdInt = menuId.toIntOrNull()
         if (menuIdInt == null) {
@@ -117,20 +128,14 @@ class SwimmingRepository(private val apiService: ApiService) {
         val allChats = handleResponse({ apiService.getChats() }, "getChats")
 
         // APIのレスポンスに `menu_id` が含まれているという前提でフィルタリングを行う。
-        // APIが `menu_id` を返さない場合、このフィルタは正しく機能しない。
         return allChats?.filter { it.menuId == menuIdInt }
     }
 
-    suspend fun getMenuChatThreads(id: String): List<ChatThread>? = handleResponse({ apiService.getMenuChatThreads(id) }, "getMenuChatThreads")
-    suspend fun createTag(tag: ApiTag): ApiTag? = handleResponse({ apiService.createTag(tag) }, "createTag")
-    suspend fun getTags(): List<ApiTag>? = handleResponse({ apiService.getTags() }, "getTags")
-    suspend fun createMenuTagRelation(relation: MenuTagRelation): MenuTagRelation? = handleResponse({ apiService.createMenuTagRelation(relation) }, "createMenuTagRelation")
+    // --- Other Endpoints ---
     suspend fun createChat(chat: ChatCreate): Chat? = handleResponse({ apiService.createChat(chat) }, "createChat")
     suspend fun getChats(): List<Chat>? = handleResponse({ apiService.getChats() }, "getChats")
     suspend fun createFavorite(favorite: Favorite): Favorite? = handleResponse({ apiService.createFavorite(favorite) }, "createFavorite")
     suspend fun getFavorites(): List<Favorite>? = handleResponse({ apiService.getFavorites() }, "getFavorites")
-    suspend fun createChatThread(chatThread: ChatThread): ChatThread? = handleResponse({ apiService.createChatThread(chatThread) }, "createChatThread")
-    suspend fun getChatThreads(): List<ChatThread>? = handleResponse({ apiService.getChatThreads() }, "getChatThreads")
     suspend fun createVideo(video: Video): Video? = handleResponse({ apiService.createVideo(video) }, "createVideo")
     suspend fun getVideos(): List<Video>? = handleResponse({ apiService.getVideos() }, "getVideos")
     suspend fun createAnalysis(analysis: Analysis): Analysis? = handleResponse({ apiService.createAnalysis(analysis) }, "createAnalysis")
@@ -142,6 +147,7 @@ class SwimmingRepository(private val apiService: ApiService) {
         comment: RequestBody,
         video: MultipartBody.Part
     ): Analysis? = handleResponse({ apiService.uploadSingleAnalysis(date, playerId, comment, video) }, "uploadSingleAnalysis")
+
     suspend fun getAnalysisJson(url: String): String? {
         return try {
             val response = apiService.getAnalysisJson(url)
@@ -158,6 +164,7 @@ class SwimmingRepository(private val apiService: ApiService) {
             throw ApiException("分析JSONの取得中に例外が発生しました: ${e.message}")
         }
     }
+
     suspend fun createAttachment(attachment: Attachment): Attachment? = handleResponse({ apiService.createAttachment(attachment) }, "createAttachment")
     suspend fun getAttachments(): List<Attachment>? = handleResponse({ apiService.getAttachments() }, "getAttachments")
 }

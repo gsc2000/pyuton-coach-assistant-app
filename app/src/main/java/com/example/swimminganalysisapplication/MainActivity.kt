@@ -40,6 +40,7 @@ import com.example.swimminganalysisapplication.ui.player.PlayerViewModelFactory
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.CreatePracticeMenuViewModelFactory
 import com.example.swimminganalysisapplication.ui.practicemenu.DiscoverScreen
+import com.example.swimminganalysisapplication.ui.practicemenu.DiscoverViewModelFactory
 import com.example.swimminganalysisapplication.ui.practicemenu.FavoritesScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListScreen
 import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListViewModelFactory
@@ -56,6 +57,8 @@ class MainActivity : ComponentActivity() {
     private val playerViewModelFactory: PlayerViewModelFactory by lazy { PlayerViewModelFactory(swimmingRepository) }
     private val singleAnalysisSetupViewModelFactory: SingleAnalysisSetupViewModelFactory by lazy { SingleAnalysisSetupViewModelFactory(swimmingRepository) }
     private val practiceListViewModelFactory: PracticeListViewModelFactory by lazy { PracticeListViewModelFactory(swimmingRepository) }
+    private val discoverViewModelFactory: DiscoverViewModelFactory by lazy { DiscoverViewModelFactory(swimmingRepository) }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -135,7 +138,10 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(AppDestinations.DISCOVER_SCREEN_ROUTE) {
-                            DiscoverScreen(navController = navController)
+                            DiscoverScreen(
+                                navController = navController,
+                                viewModel = viewModel(factory = discoverViewModelFactory)
+                            )
                         }
                         composable(
                             route = "${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId={menuId}",
