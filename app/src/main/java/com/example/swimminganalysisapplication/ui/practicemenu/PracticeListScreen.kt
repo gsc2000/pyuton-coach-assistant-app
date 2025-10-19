@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -43,8 +44,16 @@ fun PracticeListScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White, // navigationIconの色も指定
                     actionIconContentColor = Color.White
                 ),
+                // ★★★ ここから追加 ★★★
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    }
+                },
+                // ★★★ ここまで追加 ★★★
                 actions = {
                     IconButton(onClick = { navController.navigate(AppDestinations.DISCOVER_SCREEN_ROUTE) }) {
                         Icon(Icons.Default.Search, contentDescription = "メニューを探す")
@@ -84,7 +93,6 @@ fun PracticeListScreen(
                         PracticeMenuCard(
                             menu = menu,
                             onClick = {
-                                // ★★★ ここを修正: 正しいルート名と引数の渡し方に変更 ★★★
                                 navController.navigate("${AppDestinations.CREATE_PRACTICE_MENU_ROUTE_BASE}?menuId=${menu.menuId}")
                             }
                         )
