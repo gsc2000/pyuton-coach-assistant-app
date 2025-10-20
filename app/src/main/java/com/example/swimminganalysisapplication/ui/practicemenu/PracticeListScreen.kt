@@ -44,16 +44,14 @@ fun PracticeListScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White, // navigationIconの色も指定
+                    navigationIconContentColor = Color.White,
                     actionIconContentColor = Color.White
                 ),
-                // ★★★ ここから追加 ★★★
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                     }
                 },
-                // ★★★ ここまで追加 ★★★
                 actions = {
                     IconButton(onClick = { navController.navigate(AppDestinations.DISCOVER_SCREEN_ROUTE) }) {
                         Icon(Icons.Default.Search, contentDescription = "メニューを探す")
@@ -62,7 +60,8 @@ fun PracticeListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate(AppDestinations.CREATE_PRACTICE_MENU_ROUTE) }) {
+            // ★★★ ここを修正: 新規作成時は引数なしのベースルートに遷移 ★★★
+            FloatingActionButton(onClick = { navController.navigate(AppDestinations.CREATE_PRACTICE_MENU_ROUTE_BASE) }) {
                 Icon(Icons.Default.Add, contentDescription = "練習メニューを作成")
             }
         }
@@ -93,7 +92,9 @@ fun PracticeListScreen(
                         PracticeMenuCard(
                             menu = menu,
                             onClick = {
-                                navController.navigate("${AppDestinations.CREATE_PRACTICE_MENU_ROUTE_BASE}?menuId=${menu.menuId}")
+                                // ★★★ ここを修正: 正しいルート形式で引数を渡す ★★★
+                                val route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE.replace("{menuId}", menu.menuId.toString())
+                                navController.navigate(route)
                             }
                         )
                     }

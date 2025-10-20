@@ -144,7 +144,8 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(
-                            route = "${AppDestinations.CREATE_PRACTICE_MENU_ROUTE}?menuId={menuId}",
+                            // ★★★ ここを修正: 不正な文字列結合を削除 ★★★
+                            route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE,
                             arguments = listOf(navArgument("menuId") {
                                 type = NavType.StringType
                                 nullable = true
@@ -154,7 +155,7 @@ class MainActivity : ComponentActivity() {
                             val menuId = backStackEntry.arguments?.getString("menuId")
                             CreatePracticeMenuScreen(
                                 navController = navController,
-                                menuId = menuId, // ★★★ 不要な toIntOrNull() を削除 ★★★
+                                menuId = menuId,
                                 viewModel = viewModel(factory = createPracticeMenuViewModelFactory)
                             )
                         }
@@ -182,6 +183,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel(factory = playerViewModelFactory),
                                 playerId = backStackEntry.arguments?.getString("playerId")
                             )
+
                         }
                         composable(AppDestinations.PLAYER_EDIT_SCREEN_ROUTE) { // For creating new player
                             PlayerEditScreen(
@@ -216,7 +218,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             } else {
                                 Log.e("MainActivity", "NavHost: analysisId is null for ANALYSIS_PROGRESS_ROUTE.")
-                                navController.popBackStack()
                             }
                         }
                         composable(
