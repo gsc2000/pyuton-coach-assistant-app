@@ -13,12 +13,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-// ★★★ UiStateの定義を明確化 ★★★
 sealed class UiState {
     object Idle : UiState()
     object Loading : UiState()
-    object LoadSuccess : UiState() // 読み込み成功
-    object SaveSuccess : UiState() // 保存成功
+    object LoadSuccess : UiState()
+    object SaveSuccess : UiState()
     data class Error(val message: String) : UiState()
 }
 
@@ -33,6 +32,11 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
     private val _isEditable = MutableStateFlow(false)
     val isEditable: StateFlow<Boolean> = _isEditable.asStateFlow()
 
+    // ★★★ ここから追加: 公開状態を管理するStateFlow ★★★
+    private val _menuIsPublic = MutableStateFlow(false)
+    val menuIsPublic: StateFlow<Boolean> = _menuIsPublic.asStateFlow()
+    // ★★★ ここまで追加 ★★★
+
     fun loadMenu(menuId: Int?) {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
@@ -44,14 +48,17 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                 }
 
                 if (menuId == null) {
+                    // 新規作成モード
                     _isEditable.value = true
                     _practiceMenu.value = null
+                    _menuIsPublic.value = false // ★★★ 新規作成時はデフォルトで非公開 ★★★
                 } else {
+                    // 編集・閲覧モード
                     val menu = repository.getMenu(menuId)
                     _practiceMenu.value = menu
                     _isEditable.value = menu?.userId == currentUser.userId
+                    _menuIsPublic.value = menu?.menuIsPublic ?: false // ★★★ 既存メニューの公開状態をセット ★★★
                 }
-                // ★★★ 状態をLoadSuccessに変更 ★★★
                 _uiState.value = UiState.LoadSuccess
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "An unknown error occurred")
@@ -59,7 +66,8 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
         }
     }
 
-    fun saveMenu(title: String, description: String, items: List<PracticeMenuItem>, isPublic: Boolean, tags: List<String>, existingMenuId: Int?) {
+    // ★★★ isPublicパラメータを削除 ★★★
+    fun saveMenu(title: String, description: String, items: List<PracticeMenuItem>, tags: List<String>, existingMenuId: Int?) {
         viewModelScope.launch {
             if (!_isEditable.value) {
                 _uiState.value = UiState.Error("このメニューを編集する権限がありません。")
@@ -75,7 +83,7 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                     val menuToUpdate = repository.getMenu(existingMenuId)?.copy(
                         menuTitle = title,
                         menuDescription = fullDescription,
-                        menuIsPublic = isPublic
+                        menuIsPublic = _menuIsPublic.value // ★★★ StateFlowの値を使用 ★★★
                     )
                     if (menuToUpdate != null) {
                         repository.updateMenu(existingMenuId, menuToUpdate)
@@ -92,7 +100,7 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                         menuOrgId = 0,
                         menuTitle = title,
                         menuDescription = fullDescription,
-                        menuIsPublic = isPublic,
+                        menuIsPublic = _menuIsPublic.value, // ★★★ StateFlowの値を使用 ★★★
                         menuIsForked = false,
                         menuForkedFromMenuId = null,
                         menuVersion = 1,
@@ -104,7 +112,6 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                     )
                     repository.createMenu(newMenu)
                 }
-                // ★★★ 状態をSaveSuccessに変更 ★★★
                 _uiState.value = UiState.SaveSuccess
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "メニューの保存に失敗しました。")
@@ -112,7 +119,12 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
         }
     }
 
-    // ★★★ 状態をリセットするメソッドを追加 ★★★
+    // ★★★ ここから追加: 公開状態を変更するメソッド ★★★
+    fun onPublicStatusChanged(isPublic: Boolean) {
+        _menuIsPublic.value = isPublic
+    }
+    // ★★★ ここまで追加 ★★★
+
     fun resetUiState() {
         _uiState.value = UiState.Idle
     }

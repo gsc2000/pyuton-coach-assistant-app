@@ -109,6 +109,7 @@ fun CreatePracticeMenuScreen(
     val context = LocalContext.current
 
     val isEditable by viewModel.isEditable.collectAsState()
+    val isPublic by viewModel.menuIsPublic.collectAsState() // ★★★ 公開状態を収集 ★★★
 
     val screenTitle = when {
         isEditing && isEditable -> "練習メニュー編集"
@@ -130,19 +131,17 @@ fun CreatePracticeMenuScreen(
         }
     }
 
-    // ★★★ 状態に応じた処理を明確に分離 ★★★
     LaunchedEffect(uiState) {
         when (uiState) {
             is UiState.SaveSuccess -> {
                 Toast.makeText(context, "保存しました", Toast.LENGTH_SHORT).show()
                 navController.popBackStack()
-                viewModel.resetUiState() // 状態をリセット
+                viewModel.resetUiState()
             }
             is UiState.Error -> {
                 Toast.makeText(context, "エラー: ${(uiState as UiState.Error).message}", Toast.LENGTH_LONG).show()
-                viewModel.resetUiState() // 状態をリセット
+                viewModel.resetUiState()
             }
-            // LoadSuccessやIdle、Loadingの時は何もしない
             else -> {}
         }
     }
@@ -199,7 +198,6 @@ fun CreatePracticeMenuScreen(
                                     title = menuTitle,
                                     description = menuDescription,
                                     items = practiceMenuItems.toList(),
-                                    isPublic = practiceMenu?.menuIsPublic ?: false,
                                     tags = emptyList(),
                                     existingMenuId = menuId?.toIntOrNull()
                                 )
@@ -240,6 +238,26 @@ fun CreatePracticeMenuScreen(
             OutlinedTextField(value = menuTitle,onValueChange = { menuTitle = it },label = { Text("メニュータイトル") },modifier = Modifier.fillMaxWidth(), enabled = isEditable)
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(value = menuDescription,onValueChange = { menuDescription = it },label = { Text("メニュー説明 (任意)") },modifier = Modifier.fillMaxWidth(),minLines = 3, enabled = isEditable)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ★★★ ここから追加: 公開・非公開切り替えスイッチ ★★★
+            if (isEditable) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("メニューを公開する", style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = isPublic,
+                        onCheckedChange = { viewModel.onPublicStatusChanged(it) }
+                    )
+                }
+            }
+            // ★★★ ここまで追加 ★★★
+
             Spacer(modifier = Modifier.height(16.dp))
             Text("メニュー項目 (${practiceMenuItems.size})",style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
