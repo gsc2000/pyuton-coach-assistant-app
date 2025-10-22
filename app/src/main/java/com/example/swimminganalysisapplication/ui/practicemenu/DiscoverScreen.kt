@@ -1,6 +1,7 @@
 package com.example.swimminganalysisapplication.ui.practicemenu
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Menu
+import com.example.swimminganalysisapplication.navigation.AppDestinations
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,8 +110,16 @@ fun DiscoverScreen(
                     items(menus) { menu ->
                         PublicMenuCard(
                             menu = menu,
+                            onClick = {
+                                val route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE.replace("{menuId}", menu.menuId.toString())
+                                navController.navigate(route)
+                            },
                             onForkClick = {
                                 viewModel.forkMenu(menu.menuId)
+                            },
+                            onCommentClick = {
+                                val route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE.replace("{menuId}", menu.menuId.toString())
+                                navController.navigate(route)
                             }
                         )
                     }
@@ -121,12 +132,16 @@ fun DiscoverScreen(
 @Composable
 fun PublicMenuCard(
     menu: Menu,
-    onForkClick: () -> Unit
+    onClick: () -> Unit,
+    onForkClick: () -> Unit,
+    onCommentClick: () -> Unit
 ) {
     val displayDescription = menu.menuDescription?.split("---items---")?.getOrNull(0)?.trim() ?: ""
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(
@@ -135,6 +150,7 @@ fun PublicMenuCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
+                    // ★★★ ここを修正: nullの場合の代替テキストを指定 ★★★
                     text = menu.menuTitle ?: "（無題）",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
@@ -150,6 +166,14 @@ fun PublicMenuCard(
                 }
             }
             Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(onClick = onCommentClick) {
+                Icon(
+                    imageVector = Icons.Default.Comment,
+                    contentDescription = "コメントを見る",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             IconButton(onClick = onForkClick) {
                 Icon(

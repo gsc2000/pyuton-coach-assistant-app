@@ -38,12 +38,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-// --- PracticeMenuItemRow Composable (変更なし) ---
+
 @Composable
 fun PracticeMenuItemRow(
     item: PracticeMenuItem,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isEditable: Boolean
 ) {
     Row(
         modifier = modifier
@@ -70,14 +71,16 @@ fun PracticeMenuItemRow(
                 )
             }
         }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Filled.Delete, contentDescription = "Delete item", tint = MaterialTheme.colorScheme.error)
+        if (isEditable) {
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = "Delete item", tint = MaterialTheme.colorScheme.error)
+            }
         }
     }
     Divider()
 }
 
-// --- Data classes (変更なし) ---
+
 data class PracticeMenuItem(
     val id: String = java.util.UUID.randomUUID().toString(),
     var drillName: String = "",
@@ -93,27 +96,28 @@ const val CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX = "CreatePracticeMenuDragOffs
 @Composable
 fun CreatePracticeMenuScreen(
     navController: NavController,
-    menuId: String?, // ★★★ 引数名を `practiceMenuId` から `menuId` に修正 ★★★
+    menuId: String?,
     viewModel: CreatePracticeMenuViewModel
 ) {
     var menuTitle by rememberSaveable { mutableStateOf("") }
     var menuDescription by rememberSaveable { mutableStateOf("") }
     val practiceMenuItems = remember { mutableStateListOf<PracticeMenuItem>() }
 
-    val isEditing = menuId != null // ★★★ `practiceMenuId` を `menuId` に修正 ★★★
-    val screenTitle = if (isEditing) "練習メニュー編集" else "練習メニュー作成"
-
+    val isEditing = menuId != null
     val uiState by viewModel.uiState.collectAsState()
     val practiceMenu by viewModel.practiceMenu.collectAsState()
     val context = LocalContext.current
 
-    // ★★★ `practiceMenuId` を `menuId` に修正 ★★★
+    val isEditable by viewModel.isEditable.collectAsState()
+
+    val screenTitle = when {
+        isEditing && isEditable -> "練習メニュー編集"
+        isEditing && !isEditable -> "練習メニュー詳細"
+        else -> "練習メニュー作成"
+    }
+
     LaunchedEffect(key1 = menuId) {
-        if (menuId != null) {
-            menuId.toIntOrNull()?.let {
-                viewModel.loadMenu(it)
-            }
-        }
+        viewModel.loadMenu(menuId?.toIntOrNull())
     }
 
     LaunchedEffect(key1 = practiceMenu) {
@@ -126,19 +130,23 @@ fun CreatePracticeMenuScreen(
         }
     }
 
+    // ★★★ 状態に応じた処理を明確に分離 ★★★
     LaunchedEffect(uiState) {
-        when (val state = uiState) {
-            is UiState.Success -> {
-                // NOTE: This can be triggered on both load and save. Consider a more specific state for save success.
-                // Toast.makeText(context, "保存しました", Toast.LENGTH_SHORT).show()
-                // navController.popBackStack()
+        when (uiState) {
+            is UiState.SaveSuccess -> {
+                Toast.makeText(context, "保存しました", Toast.LENGTH_SHORT).show()
+                navController.popBackStack()
+                viewModel.resetUiState() // 状態をリセット
             }
             is UiState.Error -> {
-                Toast.makeText(context, "エラー: ${state.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "エラー: ${(uiState as UiState.Error).message}", Toast.LENGTH_LONG).show()
+                viewModel.resetUiState() // 状態をリセット
             }
+            // LoadSuccessやIdle、Loadingの時は何もしない
             else -> {}
         }
     }
+
 
     var showAddItemDialog by remember { mutableStateOf(false) }
     var tempDrillName by remember { mutableStateOf("") }
@@ -184,24 +192,25 @@ fun CreatePracticeMenuScreen(
                 title = { Text(screenTitle) },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
                 actions = {
-                    Button(
-                        onClick = {
-                            viewModel.saveMenu(
-                                title = menuTitle,
-                                description = menuDescription,
-                                items = practiceMenuItems.toList(),
-                                isPublic = false, // TODO: Add UI for this
-                                tags = emptyList(), // TODO: Add UI for this
-                                // ★★★ `practiceMenuId` を `menuId` に修正 ★★★
-                                existingMenuId = menuId?.toIntOrNull()
-                            )
-                        },
-                        enabled = uiState != UiState.Loading
-                    ) {
-                        if (uiState == UiState.Loading) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        } else {
-                            Text("保存")
+                    if (isEditable) {
+                        Button(
+                            onClick = {
+                                viewModel.saveMenu(
+                                    title = menuTitle,
+                                    description = menuDescription,
+                                    items = practiceMenuItems.toList(),
+                                    isPublic = practiceMenu?.menuIsPublic ?: false,
+                                    tags = emptyList(),
+                                    existingMenuId = menuId?.toIntOrNull()
+                                )
+                            },
+                            enabled = uiState != UiState.Loading
+                        ) {
+                            if (uiState == UiState.Loading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            } else {
+                                Text("保存")
+                            }
                         }
                     }
                     AccountActionsMenu(navController = navController)
@@ -213,10 +222,12 @@ fun CreatePracticeMenuScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                tempDrillName = ""; tempDistance = ""; tempRepetitions = ""; tempRest = ""; tempNotes = ""
-                showAddItemDialog = true
-            }) { Icon(Icons.Filled.Add, "メニュー項目を追加") }
+            if (isEditable) {
+                FloatingActionButton(onClick = {
+                    tempDrillName = ""; tempDistance = ""; tempRepetitions = ""; tempRest = ""; tempNotes = ""
+                    showAddItemDialog = true
+                }) { Icon(Icons.Filled.Add, "メニュー項目を追加") }
+            }
         }
     ) { paddingValuesFromScaffold ->
         Column(
@@ -226,9 +237,9 @@ fun CreatePracticeMenuScreen(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 72.dp)
         ) {
-            OutlinedTextField(value = menuTitle,onValueChange = { menuTitle = it },label = { Text("メニュータイトル") },modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = menuTitle,onValueChange = { menuTitle = it },label = { Text("メニュータイトル") },modifier = Modifier.fillMaxWidth(), enabled = isEditable)
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(value = menuDescription,onValueChange = { menuDescription = it },label = { Text("メニュー説明 (任意)") },modifier = Modifier.fillMaxWidth(),minLines = 3)
+            OutlinedTextField(value = menuDescription,onValueChange = { menuDescription = it },label = { Text("メニュー説明 (任意)") },modifier = Modifier.fillMaxWidth(),minLines = 3, enabled = isEditable)
             Spacer(modifier = Modifier.height(16.dp))
             Text("メニュー項目 (${practiceMenuItems.size})",style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
@@ -264,105 +275,107 @@ fun CreatePracticeMenuScreen(
                                     alpha = if (isBeingDragged && practiceMenuItems.size > 1) 0.9f else 1.0f
                                 }
                                 .zIndex(if (isBeingDragged) 1f else 0f)
-                                .pointerInput(menuItem.id) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            if (draggedItemIndex == null && practiceMenuItems.size > 1) {
-                                                val heightFromMap = itemHeights[menuItem.id]
-                                                draggedItemHeightPx = heightFromMap ?: defaultItemHeightPx
-                                                draggedItemIndex = index
-                                                dragOffsetY = 0f
-                                                Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "onDragStart: User touched item ID ${menuItem.id} at visual index $index. Height from map: $heightFromMap, Fallback used: ${heightFromMap == null}. Set draggedItemHeightPx: $draggedItemHeightPx")
-                                            }
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            if (draggedItemIndex == index) {
-                                                change.consume()
-                                                dragOffsetY += dragAmount.y
-
-                                                var currentItemOriginalTopY = 0f
-                                                for(i in 0 until (draggedItemIndex ?: 0) ) {
-                                                    currentItemOriginalTopY += (itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx)
+                                .pointerInput(menuItem.id, isEditable) {
+                                    if(isEditable) {
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = {
+                                                if (draggedItemIndex == null && practiceMenuItems.size > 1) {
+                                                    val heightFromMap = itemHeights[menuItem.id]
+                                                    draggedItemHeightPx = heightFromMap ?: defaultItemHeightPx
+                                                    draggedItemIndex = index
+                                                    dragOffsetY = 0f
+                                                    Log.d(CREATE_PRACTICE_MENU_TAG_DRAG_OFFSET_FIX, "onDragStart: User touched item ID ${menuItem.id} at visual index $index. Height from map: $heightFromMap, Fallback used: ${heightFromMap == null}. Set draggedItemHeightPx: $draggedItemHeightPx")
                                                 }
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                if (draggedItemIndex == index) {
+                                                    change.consume()
+                                                    dragOffsetY += dragAmount.y
 
-                                                val draggedItemCurrentCenterY = currentItemOriginalTopY + dragOffsetY + (draggedItemHeightPx / 2f)
-                                                var newDropTargetIndex = practiceMenuItems.size
-                                                var scanY = 0f
-                                                for (i in 0 until practiceMenuItems.size) {
-                                                    val currentItemSlotHeight = itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx
-                                                    val slotCenterY = scanY + currentItemSlotHeight / 2f
-                                                    if (draggedItemCurrentCenterY < slotCenterY) {
-                                                        newDropTargetIndex = i
-                                                        break
+                                                    var currentItemOriginalTopY = 0f
+                                                    for(i in 0 until (draggedItemIndex ?: 0) ) {
+                                                        currentItemOriginalTopY += (itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx)
                                                     }
-                                                    scanY += currentItemSlotHeight
-                                                }
-                                                dropTargetIndex = newDropTargetIndex
 
-                                                val scrollThresholdDp = 56.dp
-                                                val scrollSpeedPx = 10f
-                                                val scrollThresholdPx = with(density) { scrollThresholdDp.toPx() }
-
-                                                var draggedItemActualTopYInList = 0f
-                                                for(i in 0 until (draggedItemIndex ?: 0)) {
-                                                    draggedItemActualTopYInList += (itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx)
-                                                }
-
-                                                val draggedItemVisualTopInViewport = (draggedItemActualTopYInList + dragOffsetY) - lazyListState.firstVisibleItemScrollOffset
-                                                val draggedItemVisualBottomInViewport = draggedItemVisualTopInViewport + draggedItemHeightPx
-                                                val viewportHeight = lazyListState.layoutInfo.viewportSize.height
-
-                                                var performScroll: Float? = null
-                                                if (viewportHeight > 0) {
-                                                    if (draggedItemVisualTopInViewport < scrollThresholdPx) {
-                                                        performScroll = -scrollSpeedPx
-                                                    } else if (draggedItemVisualBottomInViewport > viewportHeight - scrollThresholdPx) {
-                                                        performScroll = scrollSpeedPx
+                                                    val draggedItemCurrentCenterY = currentItemOriginalTopY + dragOffsetY + (draggedItemHeightPx / 2f)
+                                                    var newDropTargetIndex = practiceMenuItems.size
+                                                    var scanY = 0f
+                                                    for (i in 0 until practiceMenuItems.size) {
+                                                        val currentItemSlotHeight = itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx
+                                                        val slotCenterY = scanY + currentItemSlotHeight / 2f
+                                                        if (draggedItemCurrentCenterY < slotCenterY) {
+                                                            newDropTargetIndex = i
+                                                            break
+                                                        }
+                                                        scanY += currentItemSlotHeight
                                                     }
-                                                }
+                                                    dropTargetIndex = newDropTargetIndex
 
-                                                if (performScroll != null) {
-                                                    if (autoScrollJob == null || !autoScrollJob!!.isActive) {
-                                                        autoScrollJob = scope.launch {
-                                                            while (isActive) {
-                                                                lazyListState.scrollBy(performScroll)
-                                                                delay(16)
-                                                            }
+                                                    val scrollThresholdDp = 56.dp
+                                                    val scrollSpeedPx = 10f
+                                                    val scrollThresholdPx = with(density) { scrollThresholdDp.toPx() }
+
+                                                    var draggedItemActualTopYInList = 0f
+                                                    for(i in 0 until (draggedItemIndex ?: 0)) {
+                                                        draggedItemActualTopYInList += (itemHeights[practiceMenuItems[i].id] ?: defaultItemHeightPx)
+                                                    }
+
+                                                    val draggedItemVisualTopInViewport = (draggedItemActualTopYInList + dragOffsetY) - lazyListState.firstVisibleItemScrollOffset
+                                                    val draggedItemVisualBottomInViewport = draggedItemVisualTopInViewport + draggedItemHeightPx
+                                                    val viewportHeight = lazyListState.layoutInfo.viewportSize.height
+
+                                                    var performScroll: Float? = null
+                                                    if (viewportHeight > 0) {
+                                                        if (draggedItemVisualTopInViewport < scrollThresholdPx) {
+                                                            performScroll = -scrollSpeedPx
+                                                        } else if (draggedItemVisualBottomInViewport > viewportHeight - scrollThresholdPx) {
+                                                            performScroll = scrollSpeedPx
                                                         }
                                                     }
-                                                } else {
-                                                    autoScrollJob?.cancel()
-                                                    autoScrollJob = null
-                                                }
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            autoScrollJob?.cancel()
-                                            autoScrollJob = null
-                                            draggedItemIndex?.let { startIndex ->
-                                                val finalTargetIndex = dropTargetIndex ?: startIndex
-                                                if (startIndex != finalTargetIndex && finalTargetIndex <= practiceMenuItems.size) {
-                                                    val itemToMove = practiceMenuItems.removeAt(startIndex)
-                                                    val actualInsertIndex = if (finalTargetIndex > startIndex && finalTargetIndex > 0) {
-                                                        (finalTargetIndex -1).coerceIn(0, practiceMenuItems.size)
+
+                                                    if (performScroll != null) {
+                                                        if (autoScrollJob == null || !autoScrollJob!!.isActive) {
+                                                            autoScrollJob = scope.launch {
+                                                                while (isActive) {
+                                                                    lazyListState.scrollBy(performScroll)
+                                                                    delay(16)
+                                                                }
+                                                            }
+                                                        }
                                                     } else {
-                                                        finalTargetIndex.coerceIn(0, practiceMenuItems.size)
+                                                        autoScrollJob?.cancel()
+                                                        autoScrollJob = null
                                                     }
-                                                    practiceMenuItems.add(actualInsertIndex, itemToMove)
                                                 }
+                                            },
+                                            onDragEnd = {
+                                                autoScrollJob?.cancel()
+                                                autoScrollJob = null
+                                                draggedItemIndex?.let { startIndex ->
+                                                    val finalTargetIndex = dropTargetIndex ?: startIndex
+                                                    if (startIndex != finalTargetIndex && finalTargetIndex <= practiceMenuItems.size) {
+                                                        val itemToMove = practiceMenuItems.removeAt(startIndex)
+                                                        val actualInsertIndex = if (finalTargetIndex > startIndex && finalTargetIndex > 0) {
+                                                            (finalTargetIndex -1).coerceIn(0, practiceMenuItems.size)
+                                                        } else {
+                                                            finalTargetIndex.coerceIn(0, practiceMenuItems.size)
+                                                        }
+                                                        practiceMenuItems.add(actualInsertIndex, itemToMove)
+                                                    }
+                                                }
+                                                draggedItemIndex = null
+                                                dragOffsetY = 0f
+                                                dropTargetIndex = null
+                                            },
+                                            onDragCancel = {
+                                                autoScrollJob?.cancel()
+                                                autoScrollJob = null
+                                                draggedItemIndex = null
+                                                dragOffsetY = 0f
+                                                dropTargetIndex = null
                                             }
-                                            draggedItemIndex = null
-                                            dragOffsetY = 0f
-                                            dropTargetIndex = null
-                                        },
-                                        onDragCancel = {
-                                            autoScrollJob?.cancel()
-                                            autoScrollJob = null
-                                            draggedItemIndex = null
-                                            dragOffsetY = 0f
-                                            dropTargetIndex = null
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                         ) {
                             PracticeMenuItemRow(
@@ -375,7 +388,8 @@ fun CreatePracticeMenuScreen(
                                             dropTargetIndex = null
                                         }
                                     }
-                                }
+                                },
+                                isEditable = isEditable
                             )
                         }
 

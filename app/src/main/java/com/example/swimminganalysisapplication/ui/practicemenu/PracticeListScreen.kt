@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -60,7 +61,6 @@ fun PracticeListScreen(
             )
         },
         floatingActionButton = {
-            // ★★★ ここを修正: 新規作成時は引数なしのベースルートに遷移 ★★★
             FloatingActionButton(onClick = { navController.navigate(AppDestinations.CREATE_PRACTICE_MENU_ROUTE_BASE) }) {
                 Icon(Icons.Default.Add, contentDescription = "練習メニューを作成")
             }
@@ -92,8 +92,12 @@ fun PracticeListScreen(
                         PracticeMenuCard(
                             menu = menu,
                             onClick = {
-                                // ★★★ ここを修正: 正しいルート形式で引数を渡す ★★★
                                 val route = AppDestinations.CREATE_PRACTICE_MENU_ROUTE.replace("{menuId}", menu.menuId.toString())
+                                navController.navigate(route)
+                            },
+                            // ★★★ コメント画面への遷移を追加 ★★★
+                            onCommentClick = {
+                                val route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE.replace("{menuId}", menu.menuId.toString())
                                 navController.navigate(route)
                             }
                         )
@@ -105,27 +109,46 @@ fun PracticeListScreen(
 }
 
 @Composable
-fun PracticeMenuCard(menu: Menu, onClick: () -> Unit) {
+fun PracticeMenuCard(
+    menu: Menu,
+    onClick: () -> Unit,
+    onCommentClick: () -> Unit // ★★★ パラメータを追加 ★★★
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        // ★★★ Rowで囲み、ボタンを配置 ★★★
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = menu.menuTitle ?: "（無題）",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = menu.menuDescription?.split("---items---")?.getOrNull(0)?.trim() ?: "説明がありません",
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = menu.menuTitle ?: "（無題）",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = menu.menuDescription?.split("---items---")?.getOrNull(0)?.trim() ?: "説明がありません",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            // ★★★ コメントボタンを追加 ★★★
+            IconButton(onClick = onCommentClick) {
+                Icon(
+                    imageVector = Icons.Default.Comment,
+                    contentDescription = "コメントを見る",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

@@ -13,6 +13,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// ★★★ UiStateの定義を明確化 ★★★
+sealed class UiState {
+    object Idle : UiState()
+    object Loading : UiState()
+    object LoadSuccess : UiState() // 読み込み成功
+    object SaveSuccess : UiState() // 保存成功
+    data class Error(val message: String) : UiState()
+}
+
 class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : ViewModel() {
 
     private val _practiceMenu = MutableStateFlow<Menu?>(null)
@@ -21,14 +30,29 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    fun loadMenu(menuId: Int) {
+    private val _isEditable = MutableStateFlow(false)
+    val isEditable: StateFlow<Boolean> = _isEditable.asStateFlow()
+
+    fun loadMenu(menuId: Int?) {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val menu = repository.getMenu(menuId)
-                Log.d("DEBUG_MENU", "Loaded menu from repository: $menu")
-                _practiceMenu.value = menu
-                _uiState.value = UiState.Success
+                val currentUser = repository.getMe()
+                if (currentUser == null) {
+                    _isEditable.value = false
+                    throw Exception("ユーザー情報が取得できません。再度ログインしてください。")
+                }
+
+                if (menuId == null) {
+                    _isEditable.value = true
+                    _practiceMenu.value = null
+                } else {
+                    val menu = repository.getMenu(menuId)
+                    _practiceMenu.value = menu
+                    _isEditable.value = menu?.userId == currentUser.userId
+                }
+                // ★★★ 状態をLoadSuccessに変更 ★★★
+                _uiState.value = UiState.LoadSuccess
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "An unknown error occurred")
             }
@@ -37,24 +61,21 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
 
     fun saveMenu(title: String, description: String, items: List<PracticeMenuItem>, isPublic: Boolean, tags: List<String>, existingMenuId: Int?) {
         viewModelScope.launch {
+            if (!_isEditable.value) {
+                _uiState.value = UiState.Error("このメニューを編集する権限がありません。")
+                return@launch
+            }
+
             _uiState.value = UiState.Loading
             try {
-                // itemsをJSON文字列に変換してdescriptionに含める
                 val itemsJson = Gson().toJson(items)
-                val fullDescription = """
-                    $description
-                    
-                    ---items---
-                    $itemsJson
-                """.trimIndent()
+                val fullDescription = "$description\n\n---items---\n$itemsJson".trimIndent()
 
                 if (existingMenuId != null) {
-                    // Update existing menu
                     val menuToUpdate = repository.getMenu(existingMenuId)?.copy(
                         menuTitle = title,
                         menuDescription = fullDescription,
                         menuIsPublic = isPublic
-                        // tags are handled separately
                     )
                     if (menuToUpdate != null) {
                         repository.updateMenu(existingMenuId, menuToUpdate)
@@ -62,35 +83,38 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
                         throw Exception("更新対象のメニューが見つかりません。")
                     }
                 } else {
-                    // Create new menu
                     val currentUser = repository.getMe()
                     if (currentUser == null) {
                         throw Exception("ユーザー情報が取得できません。再度ログインしてください。")
                     }
-
-                    // ★★★ 正しいユーザーIDを設定し、orgIdは0を仮設定 ★★★
                     val newMenu = Menu(
-                        menuId = 0, // サーバー側で自動採番
-                        menuOrgId = 0, // サーバーのデフォルト値に期待
+                        menuId = 0,
+                        menuOrgId = 0,
                         menuTitle = title,
                         menuDescription = fullDescription,
                         menuIsPublic = isPublic,
                         menuIsForked = false,
                         menuForkedFromMenuId = null,
                         menuVersion = 1,
-                        menuCreateAt = "", // サーバー側で設定
-                        menuUpdateAt = "",  // サーバー側で設定
-                        userId = currentUser.userId, // ★★★ 正しいユーザーID ★★★
+                        menuCreateAt = "",
+                        menuUpdateAt = "",
+                        userId = currentUser.userId,
                         playerId = null,
                         menuTagId = null
                     )
                     repository.createMenu(newMenu)
                 }
-                _uiState.value = UiState.Success
+                // ★★★ 状態をSaveSuccessに変更 ★★★
+                _uiState.value = UiState.SaveSuccess
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "メニューの保存に失敗しました。")
             }
         }
+    }
+
+    // ★★★ 状態をリセットするメソッドを追加 ★★★
+    fun resetUiState() {
+        _uiState.value = UiState.Idle
     }
 
     fun getItemsFromJson(description: String?): Pair<String, List<PracticeMenuItem>> {
@@ -114,14 +138,7 @@ class CreatePracticeMenuViewModel(private val repository: SwimmingRepository) : 
     }
 }
 
-sealed class UiState {
-    object Idle : UiState()
-    object Loading : UiState()
-    object Success : UiState()
-    data class Error(val message: String) : UiState()
-}
 
-// ViewModelFactoryは変更なし
 class CreatePracticeMenuViewModelFactory(private val repository: SwimmingRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CreatePracticeMenuViewModel::class.java)) {
