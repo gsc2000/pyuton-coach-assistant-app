@@ -10,8 +10,8 @@ import retrofit2.Response
 
 class SwimmingRepository(private val apiService: ApiService) {
 
-    // メニューリストのインメモリキャッシュ
-    private var menusCache: List<Menu>? = null
+    // ★★★ キャッシュのデータ構造をListからMapに変更 ★★★
+    private val menuCache = mutableMapOf<Int, Menu>()
 
     private suspend fun <T> handleResponse(
         apiCall: suspend () -> Response<T>,
@@ -47,87 +47,71 @@ class SwimmingRepository(private val apiService: ApiService) {
 
     // --- Menu Endpoints ---
     suspend fun getMenusByUserId(userId: Int, forceRefresh: Boolean = false): List<Menu>? {
-        if (menusCache != null && !forceRefresh) {
-            Log.d("SwimmingRepository", "Returning menus from cache.")
-            return menusCache
-        }
-        Log.d("SwimmingRepository", "Fetching menus from network. ForceRefresh: $forceRefresh")
         val menus = handleResponse({ apiService.getMenusByUserId(userId) }, "getMenusByUserId")
-        menusCache = menus
-        return menusCache
+        // ★★★ 取得したメニューをキャッシュに保存 ★★★
+        menus?.forEach { menuCache[it.menuId] = it }
+        return menus
     }
 
     suspend fun createMenu(menu: Menu): Menu? {
         val createdMenu = handleResponse({ apiService.createMenu(menu) }, "createMenu")
-        if (createdMenu != null) {
-            menusCache = menusCache?.plus(createdMenu)
-            Log.d("SwimmingRepository", "Added new menu to cache.")
-        }
+        // ★★★ 作成成功時、キャッシュに追加 ★★★
+        createdMenu?.let { menuCache[it.menuId] = it }
         return createdMenu
     }
 
     suspend fun getPublicMenus(): List<Menu>? {
-        return handleResponse({ apiService.getPublicMenus() }, "getPublicMenus")
+        val publicMenus = handleResponse({ apiService.getPublicMenus() }, "getPublicMenus")
+        // ★★★ 取得した公開メニューをキャッシュに保存 ★★★
+        publicMenus?.forEach { menuCache[it.menuId] = it }
+        return publicMenus
     }
 
     suspend fun getMenu(id: Int): Menu? {
-        // この部分はキャッシュから探すロジックのままにしておく
+        // ★★★ このメソッドを修正 ★★★
+        // サーバーの `GET /menus/{id}` がエラーを返すため、
+        // 必ずキャッシュからメニューを取得するように変更します。
+        // これにより、不要なAPI呼び出しと、それに伴うエラーを防ぎます。
         Log.d("SwimmingRepository", "Attempting to get menu with id $id from cache.")
-        if (menusCache == null) {
-            Log.w("SwimmingRepository", "Menu cache is null. Cannot retrieve menu item.")
-            // キャッシュがない場合はAPIから取得するフォールバックを追加しても良い
-            return handleResponse({ apiService.getMenu(id) }, "getMenu")
-        }
-        val menu = menusCache?.find { it.menuId == id }
-        if (menu == null) {
-            Log.w("SwimmingRepository", "Menu with id $id not found in cache. Fetching from network.")
-            return handleResponse({ apiService.getMenu(id) }, "getMenu")
+        val cachedMenu = menuCache[id]
+        if (cachedMenu == null) {
+            Log.w("SwimmingRepository", "Menu with id $id not found in cache. This can happen if the cache was cleared or the list containing this menu wasn't loaded first.")
         } else {
-            Log.d("SwimmingRepository", "Found menu in cache: $menu")
+            Log.d("SwimmingRepository", "Found menu in cache: $cachedMenu")
         }
-        return menu
+        return cachedMenu
     }
 
     suspend fun updateMenu(id: Int, menu: Menu): Menu? {
         val updatedMenu = handleResponse({ apiService.updateMenu(id, menu) }, "updateMenu")
-        if (updatedMenu != null) {
-            menusCache = menusCache?.map {
-                if (it.menuId == id) updatedMenu else it
-            }
-            Log.d("SwimmingRepository", "Updated menu in cache.")
-        }
+        // ★★★ 更新成功時、キャッシュも更新 ★★★
+        updatedMenu?.let { menuCache[it.menuId] = it }
         return updatedMenu
     }
 
     suspend fun deleteMenu(id: Int): Boolean {
         val success = handleResponse({ apiService.deleteMenu(id) }, "deleteMenu") != null
         if (success) {
-            menusCache = menusCache?.filterNot { it.menuId == id }
-            Log.d("SwimmingRepository", "Deleted menu from cache.")
+            // ★★★ 削除成功時、キャッシュから削除 ★★★
+            menuCache.remove(id)
         }
         return success
     }
 
     suspend fun forkMenu(menuId: Int): Menu? {
         val forkedMenu = handleResponse({ apiService.forkMenu(menuId) }, "forkMenu")
-        if (forkedMenu != null) {
-            menusCache = null // 自分のメニューキャッシュをクリアし、次回読み込み時に再取得させる
-            Log.d("SwimmingRepository", "Forked menu. Invalidated local cache.")
-        }
+        // フォークに成功したら、新しく自分のメニューが追加されているため、キャッシュを更新
+        forkedMenu?.let { menuCache[it.menuId] = it }
         return forkedMenu
     }
 
-    // ★★★ [復元] 削除されてしまっていたメソッドを元に戻しました ★★★
     suspend fun getMenuChats(menuId: String): List<Chat>? {
         val menuIdInt = menuId.toIntOrNull()
         if (menuIdInt == null) {
             Log.e("SwimmingRepository", "Invalid menuId format: $menuId. Cannot filter.")
             return emptyList()
         }
-
         val allChats = handleResponse({ apiService.getChats() }, "getChats")
-
-        // APIのレスポンスに `menu_id` が含まれているという前提でフィルタリングを行う。
         return allChats?.filter { it.menuId == menuIdInt }
     }
 
