@@ -6,6 +6,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -45,7 +47,8 @@ fun PlayerEditScreen(
     LaunchedEffect(playerState) {
         if (isEditing) {
             playerState?.let {
-                playerName = it.playerName
+                // ★★★ エラー箇所を修正 ★★★
+                playerName = it.playerName ?: ""
                 it.playerBirthday?.let { dateStr ->
                     playerBirthday = try { LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE_TIME) } catch (e: Exception) { null }
                 }

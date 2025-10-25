@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.isEmpty
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Player
@@ -80,8 +81,10 @@ fun PlayerListScreen(navController: NavController, viewModel: PlayerViewModel) {
                         PlayerItem(
                             player = player,
                             onItemClick = {
+                                // ★★★ null許容に対応 ★★★
+                                val playerName = player.playerName ?: ""
                                 navController.navigate(
-                                    AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE + "?playerId=${player.playerId}&playerName=${player.playerName}"
+                                    AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE + "?playerId=${player.playerId}&playerName=${playerName}"
                                 )
                             },
                             onEditClick = {
@@ -109,8 +112,9 @@ fun PlayerItem(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // ★★★ null許容に対応 ★★★
         Text(
-            text = player.playerName,
+            text = player.playerName ?: "名前なし",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )

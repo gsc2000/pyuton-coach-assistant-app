@@ -2,13 +2,15 @@ package com.example.swimminganalysisapplication.ui.analysis
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
-import com.example.swimminganalysisapplication.data.remote.model.Analysis
+import com.example.swimminganalysisapplication.data.remote.model.JobRequest
+import com.example.swimminganalysisapplication.data.remote.model.JobResponse
 import com.example.swimminganalysisapplication.data.remote.model.Player
 import com.example.swimminganalysisapplication.data.remote.model.PlayerCreate
 import kotlinx.coroutines.Job
@@ -19,7 +21,6 @@ import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,10 +48,18 @@ class SingleAnalysisSetupViewModel(private val repository: SwimmingRepository) :
     var isSearching by mutableStateOf(false)
         private set
 
+    var isLoading by mutableStateOf(false)
+        private set
+
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
+
     private var searchJob: Job? = null
 
-    private val _analysisResult = MutableSharedFlow<Analysis>()
-    val analysisResult = _analysisResult.asSharedFlow()
+    // ★★★ 解析結果のイベント名を JobResponse に変更 ★★★
+    private val _jobStartedEvent = MutableSharedFlow<JobResponse>()
+    val jobStartedEvent = _jobStartedEvent.asSharedFlow()
+
 
     private val _navigationEvent = MutableSharedFlow<NavigationEvent>()
     val navigationEvent = _navigationEvent.asSharedFlow()
@@ -72,14 +81,15 @@ class SingleAnalysisSetupViewModel(private val repository: SwimmingRepository) :
         isSearching = true
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            delay(1000) // Debounce
+            delay(300) // Debounce
             loadPlayers(text)
         }
     }
 
     fun onPlayerSelected(player: Player) {
         selectedPlayer = player
-        playerSearchText = player.playerName
+        // ★★★ null許容に対応 ★★★
+        playerSearchText = player.playerName ?: ""
         players = emptyList()
     }
 
@@ -89,28 +99,14 @@ class SingleAnalysisSetupViewModel(private val repository: SwimmingRepository) :
 
     private fun loadPlayers(query: String? = null) {
         viewModelScope.launch {
-            val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).format(Date())
-            // Mock data for testing without backend
-            val mockPlayers = listOf(
-                Player(playerId = 1, playerName = "田中 太郎", userId = 1, playerBirthday = "2000-01-01", playerContractStartDate = now, playerContractEndDate = null, playerCreateAt = now, playerUpdateAt = now),
-                Player(playerId = 2, playerName = "鈴木 一郎", userId = 1, playerBirthday = "2001-02-02", playerContractStartDate = now, playerContractEndDate = null, playerCreateAt = now, playerUpdateAt = now),
-                Player(playerId = 3, playerName = "佐藤 花子", userId = 1, playerBirthday = "2002-03-03", playerContractStartDate = now, playerContractEndDate = null, playerCreateAt = now, playerUpdateAt = now)
-            )
-            players = if (query.isNullOrBlank()) {
-                mockPlayers
-            } else {
-                mockPlayers.filter { it.playerName.contains(query, ignoreCase = true) }
-            }
-            isSearching = false
-            /*
+            isSearching = true
             try {
                 players = repository.getPlayers(query) ?: emptyList()
             } catch (e: Exception) {
-                // Handle error
+                errorMessage = "選手の読み込みに失敗しました: ${e.message}"
             } finally {
                 isSearching = false
             }
-            */
         }
     }
 
@@ -120,11 +116,12 @@ class SingleAnalysisSetupViewModel(private val repository: SwimmingRepository) :
                 val newPlayer = repository.createPlayer(PlayerCreate(playerName = playerName))
                 if (newPlayer != null) {
                     selectedPlayer = newPlayer
-                    playerSearchText = newPlayer.playerName
+                    // ★★★ null許容に対応 ★★★
+                    playerSearchText = newPlayer.playerName ?: ""
                     players = emptyList()
                 }
             } catch (e: Exception) {
-                // Handle error
+                errorMessage = "選手の追加に失敗しました: ${e.message}"
             }
         }
     }
@@ -135,36 +132,50 @@ class SingleAnalysisSetupViewModel(private val repository: SwimmingRepository) :
         }
     }
 
+    // ★★★ startAnalysisメソッドを正しいAPIフローに全面的に修正 ★★★
     fun startAnalysis(context: Context) {
+        if (videoUri == null) {
+            errorMessage = "動画を選択してください。"
+            return
+        }
+
         viewModelScope.launch {
-            val videoFile = videoUri?.let { uri ->
-                context.contentResolver.openInputStream(uri)?.let { inputStream ->
-                    val file = File(context.cacheDir, "upload.mp4")
-                    file.outputStream().use { outputStream ->
-                        inputStream.copyTo(outputStream)
-                    }
-                    file
-                }
-            }
-
-            if (videoFile == null || selectedPlayer == null) {
-                // Handle error: video or player not selected
-                return@launch
-            }
-
-            val dateBody = date.toRequestBody("text/plain".toMediaTypeOrNull())
-            val playerIdBody = selectedPlayer!!.playerId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
-            val commentBody = comment.toRequestBody("text/plain".toMediaTypeOrNull())
-            val videoRequestBody = videoFile.asRequestBody("video/mp4".toMediaTypeOrNull())
-            val videoPart = MultipartBody.Part.createFormData("video", videoFile.name, videoRequestBody)
-
+            isLoading = true
+            errorMessage = null
             try {
-                val result = repository.uploadSingleAnalysis(dateBody, playerIdBody, commentBody, videoPart)
-                result?.let {
-                    _analysisResult.emit(it)
-                }
+                // --- ステップ1: 動画をアップロード ---
+                val videoFile = videoUri?.let { uri ->
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        val file = File(context.cacheDir, "upload_${System.currentTimeMillis()}.mp4")
+                        file.outputStream().use { outputStream -> inputStream.copyTo(outputStream) }
+                        file
+                    }
+                } ?: throw Exception("動画ファイルの準備に失敗しました。")
+
+                val videoRequestBody = videoFile.asRequestBody("video/mp4".toMediaTypeOrNull())
+                val videoPart = MultipartBody.Part.createFormData("file", videoFile.name, videoRequestBody)
+
+                val uploadResponse = repository.uploadVideo(videoPart)
+                    ?: throw Exception("動画のアップロードに失敗しました。サーバーからの応答がありません。")
+
+                Log.d("SingleAnalysisSetupVM", "Video uploaded. File ID: ${uploadResponse.id}")
+
+                // --- ステップ2: 解析ジョブを開始 ---
+                val jobRequest = JobRequest(fileId = uploadResponse.id)
+
+                val jobResponse = repository.startInferenceJob(jobRequest)
+                    ?: throw Exception("解析ジョブの作成に失敗しました。")
+
+                Log.d("SingleAnalysisSetupVM", "Inference job started. Job ID: ${jobResponse.jobId}")
+
+                // --- ステップ3: 成功イベントを通知 ---
+                _jobStartedEvent.emit(jobResponse)
+
             } catch (e: Exception) {
-                // Handle error
+                errorMessage = e.message ?: "不明なエラーが発生しました。"
+                Log.e("SingleAnalysisSetupVM", "Analysis failed", e)
+            } finally {
+                isLoading = false
             }
         }
     }

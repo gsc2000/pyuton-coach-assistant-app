@@ -4,5 +4,15 @@ import com.google.gson.annotations.SerializedName
 
 data class PlayerCreate(
     @SerializedName("player_name")
-    val playerName: String
+    val playerName: String,
+
+    // ★★★ デフォルト値 = null を追加 ★★★
+    @SerializedName("player_birthday")
+    val playerBirthday: String? = null,
+
+    @SerializedName("player_contract_start_date")
+    val playerContractStartDate: String? = null,
+
+    @SerializedName("player_contract_end_date")
+    val playerContractEndDate: String? = null
 )

@@ -12,14 +12,17 @@ import kotlinx.coroutines.launch
 
 class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() {
 
+    // players: UIが購読できるようにStateFlowで公開
     private val _players = MutableStateFlow<List<Player>>(emptyList())
     val players: StateFlow<List<Player>> = _players.asStateFlow()
 
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
-
+    // selectedPlayer: UIが購読できるようにStateFlowで公開
     private val _selectedPlayer = MutableStateFlow<Player?>(null)
     val selectedPlayer: StateFlow<Player?> = _selectedPlayer.asStateFlow()
+
+    // errorMessage: UIが購読できるようにStateFlowで公開
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     init {
         loadPlayers()
@@ -29,7 +32,6 @@ class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() 
         viewModelScope.launch {
             try {
                 _players.value = repository.getPlayers() ?: emptyList()
-                _errorMessage.value = null
             } catch (e: Exception) {
                 _errorMessage.value = "選手の読み込みに失敗しました: ${e.message}"
             }
@@ -40,48 +42,8 @@ class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() 
         viewModelScope.launch {
             try {
                 _selectedPlayer.value = repository.getPlayer(playerId)
-                _errorMessage.value = null
             } catch (e: Exception) {
                 _errorMessage.value = "選手情報の読み込みに失敗しました: ${e.message}"
-            }
-        }
-    }
-
-    fun savePlayer(
-        playerName: String,
-        birthday: String?,
-        contractStartDate: String?,
-        contractEndDate: String?,
-        onSaveFinished: () -> Unit
-    ) {
-        viewModelScope.launch {
-            try {
-                val playerToSave = _selectedPlayer.value?.copy(
-                    playerName = playerName,
-                    playerBirthday = birthday,
-                    playerContractStartDate = contractStartDate,
-                    playerContractEndDate = contractEndDate
-                )
-                    ?: Player(
-                        playerId = 0,
-                        userId = 0, // Assuming default or to-be-filled user ID
-                        playerName = playerName,
-                        playerBirthday = birthday,
-                        playerContractStartDate = contractStartDate,
-                        playerContractEndDate = contractEndDate,
-                        playerCreateAt = "",
-                        playerUpdateAt = ""
-                    )
-
-                if (playerToSave.playerId == 0) {
-                    repository.createPlayer(PlayerCreate(playerName = playerToSave.playerName))
-                } else {
-                    repository.updatePlayer(playerToSave.playerId, playerToSave)
-                }
-                loadPlayers() // Refresh the list
-                onSaveFinished()
-            } catch (e: Exception) {
-                _errorMessage.value = "選手の保存に失敗しました: ${e.message}"
             }
         }
     }
@@ -90,13 +52,50 @@ class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() 
         _selectedPlayer.value = null
     }
 
-    fun deletePlayer(onDeleteFinished: () -> Unit) {
+    fun savePlayer(
+        playerName: String,
+        birthday: String?,
+        contractStartDate: String?,
+        contractEndDate: String?,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val currentPlayer = _selectedPlayer.value
+                if (currentPlayer != null) {
+                    // 更新
+                    val updatedPlayer = currentPlayer.copy(
+                        playerName = playerName,
+                        playerBirthday = birthday,
+                        playerContractStartDate = contractStartDate,
+                        playerContractEndDate = contractEndDate
+                    )
+                    repository.updatePlayer(currentPlayer.playerId, updatedPlayer)
+                } else {
+                    // 新規作成
+                    val newPlayer = PlayerCreate(
+                        playerName = playerName,
+                        playerBirthday = birthday,
+                        playerContractStartDate = contractStartDate,
+                        playerContractEndDate = contractEndDate
+                    )
+                    repository.createPlayer(newPlayer)
+                }
+                loadPlayers() // 一覧を更新
+                onSuccess()   // 成功したら画面を閉じる
+            } catch (e: Exception) {
+                _errorMessage.value = "選手の保存に失敗しました: ${e.message}"
+            }
+        }
+    }
+
+    fun deletePlayer(onSuccess: () -> Unit) {
         viewModelScope.launch {
             _selectedPlayer.value?.let { player ->
                 try {
                     repository.deletePlayer(player.playerId)
-                    loadPlayers() // Refresh the list
-                    onDeleteFinished()
+                    onSuccess()
+                    loadPlayers() // 一覧を更新
                 } catch (e: Exception) {
                     _errorMessage.value = "選手の削除に失敗しました: ${e.message}"
                 }

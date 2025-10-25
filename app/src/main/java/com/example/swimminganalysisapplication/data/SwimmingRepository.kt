@@ -10,7 +10,6 @@ import retrofit2.Response
 
 class SwimmingRepository(private val apiService: ApiService) {
 
-    // ★★★ キャッシュのデータ構造をListからMapに変更 ★★★
     private val menuCache = mutableMapOf<Int, Menu>()
 
     private suspend fun <T> handleResponse(
@@ -48,43 +47,33 @@ class SwimmingRepository(private val apiService: ApiService) {
     // --- Menu Endpoints ---
     suspend fun getMenusByUserId(userId: Int, forceRefresh: Boolean = false): List<Menu>? {
         val menus = handleResponse({ apiService.getMenusByUserId(userId) }, "getMenusByUserId")
-        // ★★★ 取得したメニューをキャッシュに保存 ★★★
         menus?.forEach { menuCache[it.menuId] = it }
         return menus
     }
 
     suspend fun createMenu(menu: Menu): Menu? {
         val createdMenu = handleResponse({ apiService.createMenu(menu) }, "createMenu")
-        // ★★★ 作成成功時、キャッシュに追加 ★★★
         createdMenu?.let { menuCache[it.menuId] = it }
         return createdMenu
     }
 
     suspend fun getPublicMenus(): List<Menu>? {
         val publicMenus = handleResponse({ apiService.getPublicMenus() }, "getPublicMenus")
-        // ★★★ 取得した公開メニューをキャッシュに保存 ★★★
         publicMenus?.forEach { menuCache[it.menuId] = it }
         return publicMenus
     }
 
     suspend fun getMenu(id: Int): Menu? {
-        // ★★★ このメソッドを修正 ★★★
-        // サーバーの `GET /menus/{id}` がエラーを返すため、
-        // 必ずキャッシュからメニューを取得するように変更します。
-        // これにより、不要なAPI呼び出しと、それに伴うエラーを防ぎます。
         Log.d("SwimmingRepository", "Attempting to get menu with id $id from cache.")
         val cachedMenu = menuCache[id]
         if (cachedMenu == null) {
-            Log.w("SwimmingRepository", "Menu with id $id not found in cache. This can happen if the cache was cleared or the list containing this menu wasn't loaded first.")
-        } else {
-            Log.d("SwimmingRepository", "Found menu in cache: $cachedMenu")
+            Log.w("SwimmingRepository", "Menu with id $id not found in cache.")
         }
         return cachedMenu
     }
 
     suspend fun updateMenu(id: Int, menu: Menu): Menu? {
         val updatedMenu = handleResponse({ apiService.updateMenu(id, menu) }, "updateMenu")
-        // ★★★ 更新成功時、キャッシュも更新 ★★★
         updatedMenu?.let { menuCache[it.menuId] = it }
         return updatedMenu
     }
@@ -92,7 +81,6 @@ class SwimmingRepository(private val apiService: ApiService) {
     suspend fun deleteMenu(id: Int): Boolean {
         val success = handleResponse({ apiService.deleteMenu(id) }, "deleteMenu") != null
         if (success) {
-            // ★★★ 削除成功時、キャッシュから削除 ★★★
             menuCache.remove(id)
         }
         return success
@@ -100,22 +88,26 @@ class SwimmingRepository(private val apiService: ApiService) {
 
     suspend fun forkMenu(menuId: Int): Menu? {
         val forkedMenu = handleResponse({ apiService.forkMenu(menuId) }, "forkMenu")
-        // フォークに成功したら、新しく自分のメニューが追加されているため、キャッシュを更新
         forkedMenu?.let { menuCache[it.menuId] = it }
         return forkedMenu
     }
 
+    suspend fun uploadVideo(videoFile: MultipartBody.Part): VideoUploadResponse? {
+        return handleResponse({ apiService.uploadVideo(videoFile) }, "uploadVideo")
+    }
+
+    // ★★★ ここから追加 ★★★
+    suspend fun startInferenceJob(jobRequest: JobRequest): JobResponse? {
+        return handleResponse({ apiService.inferenceJob(jobRequest) }, "startInferenceJob")
+    }
+    // ★★★ ここまで追加 ★★★
+
+    // --- Other Endpoints ---
     suspend fun getMenuChats(menuId: String): List<Chat>? {
-        val menuIdInt = menuId.toIntOrNull()
-        if (menuIdInt == null) {
-            Log.e("SwimmingRepository", "Invalid menuId format: $menuId. Cannot filter.")
-            return emptyList()
-        }
+        val menuIdInt = menuId.toIntOrNull() ?: return emptyList()
         val allChats = handleResponse({ apiService.getChats() }, "getChats")
         return allChats?.filter { it.menuId == menuIdInt }
     }
-
-    // --- Other Endpoints ---
     suspend fun createChat(chat: ChatCreate): Chat? = handleResponse({ apiService.createChat(chat) }, "createChat")
     suspend fun getChats(): List<Chat>? = handleResponse({ apiService.getChats() }, "getChats")
     suspend fun createFavorite(favorite: Favorite): Favorite? = handleResponse({ apiService.createFavorite(favorite) }, "createFavorite")
@@ -136,15 +128,11 @@ class SwimmingRepository(private val apiService: ApiService) {
         return try {
             val response = apiService.getAnalysisJson(url)
             if (response.isSuccessful) {
-                Log.i("SwimmingRepository", "Fetched analysis JSON successfully.")
                 response.body()?.string()
             } else {
-                val errorMsg = "Failed to fetch analysis JSON: ${response.code()} ${response.message()}"
-                Log.e("SwimmingRepository", errorMsg)
                 throw ApiException("分析JSONの取得に失敗しました: ${response.code()}")
             }
         } catch (e: Exception) {
-            Log.e("SwimmingRepository", "Exception during getAnalysisJson: ${e.message}", e)
             throw ApiException("分析JSONの取得中に例外が発生しました: ${e.message}")
         }
     }

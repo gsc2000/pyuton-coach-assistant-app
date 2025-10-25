@@ -1,6 +1,7 @@
 package com.example.swimminganalysisapplication.ui.analysis
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -12,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
@@ -37,11 +40,14 @@ fun SingleAnalysisSetupScreen(
     val playerSearchText by remember { derivedStateOf { viewModel.playerSearchText } }
     val players by remember { derivedStateOf { viewModel.players } }
     val isSearching by remember { derivedStateOf { viewModel.isSearching } }
+    val isLoading by remember { derivedStateOf { viewModel.isLoading } }
+    val errorMessage by remember { derivedStateOf { viewModel.errorMessage } }
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        viewModel.analysisResult.collectLatest { analysis ->
-            navController.navigate("${AppDestinations.ANALYSIS_PROGRESS_ROUTE}/${analysis.analysisId}")
+        viewModel.jobStartedEvent.collectLatest { jobResponse ->
+            Toast.makeText(context, "解析ジョブを開始しました: ${jobResponse.jobId}", Toast.LENGTH_SHORT).show()
+            navController.popBackStack()
         }
         viewModel.navigationEvent.collectLatest { event ->
             when (event) {
@@ -70,65 +76,69 @@ fun SingleAnalysisSetupScreen(
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Video selection
-            Button(onClick = { videoPickerLauncher.launch("video/*") }) {
-                Text(if (videoUri != null) "動画を変更" else "動画を選択")
-            }
-            videoUri?.let {
-                Text("選択中の動画: ${it.path}")
-            }
-
-            // Date picker
-            OutlinedTextField(
-                value = date,
-                onValueChange = { viewModel.onDateChange(it) },
-                label = { Text("日付") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Player search and selection
-            PlayerSearch(
-                searchText = playerSearchText,
-                onSearchTextChange = { viewModel.onPlayerSearchTextChange(it) },
-                players = players,
-                onPlayerSelected = { viewModel.onPlayerSelected(it) },
-                onAddNewPlayer = { viewModel.addNewPlayer(it) },
-                isSearching = isSearching
-            )
-
-
-            // Comment
-            OutlinedTextField(
-                value = comment,
-                onValueChange = { viewModel.onCommentChange(it) },
-                label = { Text("コメント") },
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 4
-            )
-
-            // Start analysis button
-            Button(
-                onClick = { viewModel.startAnalysis(context) },
-                enabled = videoUri != null && selectedPlayer != null
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("解析開始")
+                Button(onClick = { videoPickerLauncher.launch("video/*") }) {
+                    Text(if (videoUri != null) "動画を変更" else "動画を選択")
+                }
+                videoUri?.let {
+                    Text("選択中の動画: ${it.path}")
+                }
+
+                OutlinedTextField(
+                    value = date,
+                    onValueChange = { viewModel.onDateChange(it) },
+                    label = { Text("日付") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // ★★★ null許容の playerName を正しく扱うように修正 ★★★
+                PlayerSearch(
+                    searchText = playerSearchText,
+                    onSearchTextChange = { viewModel.onPlayerSearchTextChange(it) },
+                    players = players,
+                    onPlayerSelected = { viewModel.onPlayerSelected(it) },
+                    onAddNewPlayer = { viewModel.addNewPlayer(it) },
+                    isSearching = isSearching
+                )
+
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { viewModel.onCommentChange(it) },
+                    label = { Text("コメント") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 4
+                )
+
+                errorMessage?.let {
+                    Text(text = it, color = MaterialTheme.colorScheme.error)
+                }
+
+                Button(
+                    onClick = { viewModel.startAnalysis(context) },
+                    enabled = videoUri != null && selectedPlayer != null && !isLoading
+                ) {
+                    Text("解析開始")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = { viewModel.onNavigateToAnalysisListClicked() }
+                ) {
+                    Text("解析一覧へ")
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Navigate to analysis list button
-            Button(
-                onClick = { viewModel.onNavigateToAnalysisListClicked() }
-            ) {
-                Text("解析一覧へ")
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
         }
     }
@@ -147,23 +157,24 @@ fun PlayerSearch(
     var textFieldValue by remember { mutableStateOf(TextFieldValue(searchText)) }
     var expanded by remember { mutableStateOf(false) }
 
-    // ViewModelのsearchTextが変更された場合（例：選手選択後）に内部の状態を更新
+    // searchText (from ViewModel) -> textFieldValue
     LaunchedEffect(searchText) {
         if (textFieldValue.text != searchText) {
             textFieldValue = textFieldValue.copy(text = searchText)
         }
     }
 
-    // 入力が落ち着いたら検索を実行
+    // textFieldValue -> onSearchTextChange (to ViewModel) with debounce
     LaunchedEffect(textFieldValue) {
-        // 変換中は検索しない
+        // To avoid sending intermediate states of IME composition
         if (textFieldValue.composition == null) {
-            delay(300) // 300msのデバウンス
+            delay(300)
             if (textFieldValue.text != searchText) {
                 onSearchTextChange(textFieldValue.text)
             }
         }
     }
+
 
     Box {
         OutlinedTextField(
@@ -174,7 +185,7 @@ fun PlayerSearch(
             },
             label = { Text("選手を検索") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true, // 改行を無効化
+            singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
         )
 
@@ -192,20 +203,22 @@ fun PlayerSearch(
                 )
             } else {
                 players.forEach { player ->
+                    // ★★★ ここでnullをチェックし、代替テキストを表示 ★★★
+                    val playerName = player.playerName ?: "名前なし"
                     DropdownMenuItem(
-                        text = { Text(player.playerName) },
+                        text = { Text(playerName) },
                         onClick = {
                             onPlayerSelected(player)
-                            // textfieldの値を更新するが、onSearchTextChangeは呼ばない
                             textFieldValue = textFieldValue.copy(
-                                text = player.playerName,
-                                selection = TextRange(player.playerName.length)
+                                text = playerName,
+                                selection = TextRange(playerName.length)
                             )
                             expanded = false
                         }
                     )
                 }
-                if (players.none { it.playerName.equals(textFieldValue.text, ignoreCase = true) } && textFieldValue.text.isNotBlank()) {
+                // ★★★ ここでもnullをチェック ★★★
+                if (players.none { (it.playerName ?: "").equals(textFieldValue.text, ignoreCase = true) } && textFieldValue.text.isNotBlank()) {
                     DropdownMenuItem(
                         text = { Text("「${textFieldValue.text}」を新規追加") },
                         onClick = {

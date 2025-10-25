@@ -3,20 +3,21 @@ package com.example.swimminganalysisapplication.data.remote.model
 import com.google.gson.annotations.SerializedName
 
 data class Player(
-    @SerializedName("player_id")
+    @SerializedName("playerId")
     val playerId: Int,
-    @SerializedName("player_name")
-    val playerName: String,
-    @SerializedName("player_birthday")
+    // ★★★ 型を String? に変更 ★★★
+    @SerializedName("playerName")
+    val playerName: String?,
+    @SerializedName("userId")
+    val userId: Int,
+    @SerializedName("playerBirthday")
     val playerBirthday: String?,
-    @SerializedName("player_contract_start_date")
+    @SerializedName("playerContractStartDate")
     val playerContractStartDate: String?,
-    @SerializedName("player_contract_end_date")
+    @SerializedName("playerContractEndDate")
     val playerContractEndDate: String?,
-    @SerializedName("player_create_at")
+    @SerializedName("playerCreateAt")
     val playerCreateAt: String,
-    @SerializedName("player_update_at")
-    val playerUpdateAt: String,
-    @SerializedName("user_id")
-    val userId: Int
+    @SerializedName("playerUpdateAt")
+    val playerUpdateAt: String
 )
