@@ -5,12 +5,17 @@ import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.model.Player
 import com.example.swimminganalysisapplication.data.remote.model.PlayerCreate
+import com.example.swimminganalysisapplication.data.storage.UserPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() {
+class PlayerViewModel(
+    private val repository: SwimmingRepository,
+    private val userPreferences: UserPreferences
+) : ViewModel() {
 
     // players: UIが購読できるようにStateFlowで公開
     private val _players = MutableStateFlow<List<Player>>(emptyList())
@@ -61,6 +66,12 @@ class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() 
     ) {
         viewModelScope.launch {
             try {
+                val userId = userPreferences.userId.first()
+                if (userId == null) {
+                    _errorMessage.value = "ユーザー情報が取得できませんでした。再度ログインしてください。"
+                    return@launch
+                }
+
                 val currentPlayer = _selectedPlayer.value
                 if (currentPlayer != null) {
                     // 更新
@@ -77,7 +88,8 @@ class PlayerViewModel(private val repository: SwimmingRepository) : ViewModel() 
                         playerName = playerName,
                         playerBirthday = birthday,
                         playerContractStartDate = contractStartDate,
-                        playerContractEndDate = contractEndDate
+                        playerContractEndDate = contractEndDate,
+                        userId = userId
                     )
                     repository.createPlayer(newPlayer)
                 }

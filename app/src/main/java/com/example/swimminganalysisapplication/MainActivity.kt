@@ -54,8 +54,8 @@ class MainActivity : ComponentActivity() {
     private val userPreferences: UserPreferences by lazy { UserPreferences(applicationContext) }
     private val createPracticeMenuViewModelFactory by lazy { CreatePracticeMenuViewModelFactory(swimmingRepository) }
     private val loginViewModelFactory: LoginViewModelFactory by lazy { LoginViewModelFactory(swimmingRepository, userPreferences) }
-    private val playerViewModelFactory: PlayerViewModelFactory by lazy { PlayerViewModelFactory(swimmingRepository) }
-    private val singleAnalysisSetupViewModelFactory: SingleAnalysisSetupViewModelFactory by lazy { SingleAnalysisSetupViewModelFactory(swimmingRepository) }
+    private val playerViewModelFactory: PlayerViewModelFactory by lazy { PlayerViewModelFactory(swimmingRepository, userPreferences) }
+    private val singleAnalysisSetupViewModelFactory: SingleAnalysisSetupViewModelFactory by lazy { SingleAnalysisSetupViewModelFactory(swimmingRepository, userPreferences) }
     private val practiceListViewModelFactory: PracticeListViewModelFactory by lazy { PracticeListViewModelFactory(swimmingRepository) }
     private val discoverViewModelFactory: DiscoverViewModelFactory by lazy { DiscoverViewModelFactory(swimmingRepository) }
 

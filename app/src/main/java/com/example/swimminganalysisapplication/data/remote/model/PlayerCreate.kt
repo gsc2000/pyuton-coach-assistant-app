@@ -6,7 +6,6 @@ data class PlayerCreate(
     @SerializedName("player_name")
     val playerName: String,
 
-    // ★★★ デフォルト値 = null を追加 ★★★
     @SerializedName("player_birthday")
     val playerBirthday: String? = null,
 
@@ -14,5 +13,8 @@ data class PlayerCreate(
     val playerContractStartDate: String? = null,
 
     @SerializedName("player_contract_end_date")
-    val playerContractEndDate: String? = null
+    val playerContractEndDate: String? = null,
+
+    @SerializedName("user_id")
+    val userId: Int
 )

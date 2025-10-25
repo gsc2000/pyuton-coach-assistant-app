@@ -3,7 +3,7 @@ package com.example.swimminganalysisapplication.ui.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
-import com.example.swimminganalysisapplication.data.remote.model.UserLogin // ★ インポートを追加
+import com.example.swimminganalysisapplication.data.remote.model.UserLogin
 import com.example.swimminganalysisapplication.data.storage.UserPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,18 +36,26 @@ class LoginViewModel(
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
             try {
-                // ★★★ 修正点：UserLoginオブジェクトを生成して渡す ★★★
                 val userLogin = UserLogin(
                     userEmail = _email.value.trim(),
                     userPassword = _password.value.trim()
                 )
 
+                // 1. トークンを取得
                 val tokenResponse = repository.login(userLogin)
-                // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
                 if (tokenResponse != null) {
+                    // 2. トークンを保存 (getMe()の前に保存して認証を通す)
                     userPreferences.saveAuthToken(tokenResponse.accessToken)
-                    _loginState.value = LoginState.Success
+
+                    // 3. ユーザー情報を取得
+                    val user = repository.getMe()
+                    if (user != null) {
+                        // 4. userIdを保存
+                        userPreferences.saveUserId(user.userId)
+                        _loginState.value = LoginState.Success
+                    } else {
+                        _loginState.value = LoginState.Error("ユーザー情報の取得に失敗しました。")
+                    }
                 } else {
                     _loginState.value = LoginState.Error("トークンの取得に失敗しました。")
                 }

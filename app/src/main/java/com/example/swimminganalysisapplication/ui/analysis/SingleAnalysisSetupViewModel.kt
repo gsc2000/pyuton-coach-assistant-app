@@ -13,10 +13,12 @@ import com.example.swimminganalysisapplication.data.remote.model.JobRequest
 import com.example.swimminganalysisapplication.data.remote.model.JobResponse
 import com.example.swimminganalysisapplication.data.remote.model.Player
 import com.example.swimminganalysisapplication.data.remote.model.PlayerCreate
+import com.example.swimminganalysisapplication.data.storage.UserPreferences
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -26,7 +28,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class SingleAnalysisSetupViewModel(private val repository: SwimmingRepository) : ViewModel() {
+class SingleAnalysisSetupViewModel(
+    private val repository: SwimmingRepository,
+    private val userPreferences: UserPreferences
+) : ViewModel() {
     var videoUri by mutableStateOf<Uri?>(null)
         private set
 
@@ -113,7 +118,12 @@ class SingleAnalysisSetupViewModel(private val repository: SwimmingRepository) :
     fun addNewPlayer(playerName: String) {
         viewModelScope.launch {
             try {
-                val newPlayer = repository.createPlayer(PlayerCreate(playerName = playerName))
+                val userId = userPreferences.userId.first()
+                if (userId == null) {
+                    errorMessage = "ユーザー情報が取得できませんでした。再度ログインしてください。"
+                    return@launch
+                }
+                val newPlayer = repository.createPlayer(PlayerCreate(playerName = playerName, userId = userId))
                 if (newPlayer != null) {
                     selectedPlayer = newPlayer
                     // ★★★ null許容に対応 ★★★

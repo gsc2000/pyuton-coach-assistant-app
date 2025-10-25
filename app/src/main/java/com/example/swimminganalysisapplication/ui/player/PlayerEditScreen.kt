@@ -147,12 +147,12 @@ fun PlayerEditScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = {
-                    val formatter = DateTimeFormatter.ISO_DATE_TIME
+                    val formatter = DateTimeFormatter.ISO_LOCAL_DATE // YYYY-MM-DD
                     viewModel.savePlayer(
                         playerName = playerName,
-                        birthday = playerBirthday?.atStartOfDay(ZoneId.systemDefault())?.format(formatter),
-                        contractStartDate = playerContractStartDate?.atStartOfDay(ZoneId.systemDefault())?.format(formatter),
-                        contractEndDate = playerContractEndDate?.atStartOfDay(ZoneId.systemDefault())?.format(formatter)
+                        birthday = playerBirthday?.format(formatter),
+                        contractStartDate = playerContractStartDate?.format(formatter),
+                        contractEndDate = playerContractEndDate?.format(formatter)
                     ) {
                         navController.popBackStack()
                     }
