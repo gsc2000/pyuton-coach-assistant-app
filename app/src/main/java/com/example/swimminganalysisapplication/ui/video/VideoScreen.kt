@@ -15,15 +15,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings // For Start Position Settings
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
@@ -40,13 +40,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -62,9 +61,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
-import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu // ★ AccountActionsMenu をインポート
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch // Import launch
+import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import kotlin.math.abs
@@ -74,8 +73,15 @@ import kotlin.math.min
 private const val TAG = "VideoScreen"
 private const val SEEK_COMMAND_THRESHOLD_MS = 200 // Threshold to avoid tiny seeks
 
+enum class VideoLayoutMode {
+    OVERLAY_VIDEO2_TRANSPARENT, // video2 is semi-transparent
+    VERTICAL,
+    HORIZONTAL,
+    OVERLAY_VIDEO1_TRANSPARENT, // video1 is semi-transparent
+}
+
 // Saver for Uri type for rememberSaveable
-val UriSaver: Saver<Uri?, String> = Saver(
+val UriSaver = Saver<Uri?, String>(
     save = { uri: Uri? -> uri?.toString() ?: "" },
     restore = { value: String -> if (value.isNotEmpty()) Uri.parse(value) else null }
 )
@@ -96,7 +102,9 @@ private fun VideoPlayerBox(
     currentPositionInTrimmedView: Long,
     durationOfTrimmedView: Long,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    alpha: Float = 1.0f
+
 ) {
     Box(
         modifier = modifier.clickable(onClick = onClick),
@@ -107,6 +115,7 @@ private fun VideoPlayerBox(
                 .fillMaxWidth()
                 .aspectRatio(videoAspectRatio ?: 16f / 9f)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
+                .alpha(alpha)
         ) {
             if (exoPlayer != null) {
                 AndroidView(
@@ -200,7 +209,7 @@ fun VideoScreen(navController: NavController) {
 
 
     var isPlaying by rememberSaveable { mutableStateOf(false) }
-    var isHorizontalLayout by rememberSaveable { mutableStateOf(true) }
+    var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
 
     var sharedCurrentPositionMs by rememberSaveable { mutableStateOf(0L) }
     var sharedMaxDurationMs by rememberSaveable { mutableStateOf(0L) }
@@ -544,8 +553,8 @@ fun VideoScreen(navController: NavController) {
                     }) {
                         Icon(Icons.Filled.Settings, "開始位置設定")
                     }
-                    IconButton(onClick = { isHorizontalLayout = !isHorizontalLayout }) {
-                        Icon(if (isHorizontalLayout) Icons.Filled.SwapVert else Icons.Filled.SwapHoriz, if (isHorizontalLayout) "縦並びに変更" else "横並びに変更")
+                    IconButton(onClick = { layoutMode = layoutMode.next() }) {
+                        Icon(layoutMode.icon, contentDescription = layoutMode.description)
                     }
                     AccountActionsMenu(navController = navController) // ★ AccountActionsMenu を追加
                 },
@@ -562,63 +571,74 @@ fun VideoScreen(navController: NavController) {
                 .padding(paddingValues)
         ) {
             Box(modifier = Modifier.weight(1f)) {
-                if (isHorizontalLayout) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        VideoPlayerBox(
-                            exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
-                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
-                            durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
-                            onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
-                        )
-                        if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier
-                            .width(4.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.surfaceVariant))
-                        VideoPlayerBox(
-                            exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
-                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
-                            durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
-                            onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
-                        )
-                    }
-                } else { // Vertical layout
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 8.dp)
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        VideoPlayerBox(
-                            exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
-                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
-                            durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
-                            onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (exoPlayer1 != null || exoPlayer2 != null) {
-                            Spacer(Modifier.height(8.dp))
+                when (layoutMode) {
+                    VideoLayoutMode.HORIZONTAL -> {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            VideoPlayerBox(
+                                exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
+                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
+                                durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
+                                onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
+                                modifier = Modifier.weight(1f).padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
+                            )
+                            if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier.width(4.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
+                            VideoPlayerBox(
+                                exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
+                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
+                                durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
+                                onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
+                                modifier = Modifier.weight(1f).padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
+                            )
                         }
-                        VideoPlayerBox(
-                            exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
-                            currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
-                            durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
-                            onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    }
+                    VideoLayoutMode.VERTICAL -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp).verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            VideoPlayerBox(
+                                exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
+                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
+                                durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
+                                onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (exoPlayer1 != null || exoPlayer2 != null) Spacer(Modifier.height(8.dp))
+                            VideoPlayerBox(
+                                exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
+                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
+                                durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
+                                onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                    VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT, VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> {
+                        val (alpha1, alpha2) = if (layoutMode == VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT) Pair(0.5f, 1f) else Pair(1f, 0.5f)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            VideoPlayerBox(
+                                exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
+                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
+                                durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
+                                onClick = { /* Overlay mode, click disabled */ },
+                                modifier = Modifier.fillMaxSize(),
+                                alpha = alpha1
+                            )
+                            VideoPlayerBox(
+                                exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
+                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
+                                durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
+                                onClick = { /* Overlay mode, click disabled */ },
+                                modifier = Modifier.fillMaxSize(),
+                                alpha = alpha2
+                            )
+                        }
                     }
                 }
             }
-
 
             // Controls section
             if (sharedMaxDurationMs > 0) {
@@ -637,7 +657,6 @@ fun VideoScreen(navController: NavController) {
                 Spacer(modifier = Modifier.height(56.dp)) // Placeholder for controls height when no video
             }
 
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -652,5 +671,30 @@ fun VideoScreen(navController: NavController) {
                 }
             }
         }
+    }
+}
+
+val VideoLayoutMode.icon: ImageVector
+    get() = when (this) {
+        VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> Icons.Filled.SwapVert
+        VideoLayoutMode.VERTICAL -> Icons.Filled.SwapHoriz
+        VideoLayoutMode.HORIZONTAL -> Icons.Filled.Layers
+        VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT -> Icons.Filled.Layers
+    }
+
+val VideoLayoutMode.description: String
+    get() = when (this) {
+        VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> "縦並びに変更"
+        VideoLayoutMode.VERTICAL -> "横並びに変更"
+        VideoLayoutMode.HORIZONTAL -> "重ね表示 (Video1が半透明)"
+        VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT -> "重ね表示 (Video2が半透明)"
+    }
+
+fun VideoLayoutMode.next(): VideoLayoutMode {
+    return when (this) {
+        VideoLayoutMode.HORIZONTAL -> VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT
+        VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT -> VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT
+        VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> VideoLayoutMode.VERTICAL
+        VideoLayoutMode.VERTICAL -> VideoLayoutMode.HORIZONTAL
     }
 }
