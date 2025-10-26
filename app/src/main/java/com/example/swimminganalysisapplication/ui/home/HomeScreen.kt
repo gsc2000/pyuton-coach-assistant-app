@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp // ExitToAp
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Pool
@@ -31,21 +32,6 @@ private const val TAG_HOME = "HomeScreen"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
-    var showDialog by remember { mutableStateOf(false) }
-
-    if (showDialog) {
-        AnalysisTypeSelectionDialog(
-            onDismissRequest = { showDialog = false },
-            onSingleAnalysisClick = {
-                showDialog = false
-                navController.navigate(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE)
-            },
-            onComparisonAnalysisClick = {
-                showDialog = false
-                navController.navigate(AppDestinations.VIDEO_SCREEN_ROUTE)
-            }
-        )
-    }
 
     Scaffold(
         topBar = {
@@ -115,9 +101,15 @@ fun HomeScreen(navController: NavController) {
             Divider(modifier = Modifier.padding(vertical = 16.dp))
 
             HomeNavigationCard(
-                title = "解析",
+                title = "単体解析",
                 icon = Icons.Filled.Analytics,
-                onClick = { showDialog = true }
+                onClick = { navController.navigate(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE) }
+            )
+
+            HomeNavigationCard(
+                title = "比較解析",
+                icon = Icons.Filled.Compare,
+                onClick = { navController.navigate(AppDestinations.VIDEO_SCREEN_ROUTE) }
             )
 
             HomeNavigationCard(
