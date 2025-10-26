@@ -21,9 +21,12 @@ import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.RetrofitClient
 import com.example.swimminganalysisapplication.data.storage.UserPreferences
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.analysis.AnalysisDetailScreen
 import com.example.swimminganalysisapplication.ui.analysis.AnalysisListScreen
 import com.example.swimminganalysisapplication.ui.analysis.AnalysisProgressScreen
 import com.example.swimminganalysisapplication.ui.analysis.AnalysisProgressViewModelFactory
+import com.example.swimminganalysisapplication.ui.analysis.AnalysisViewModel
+import com.example.swimminganalysisapplication.ui.analysis.AnalysisViewModelFactory
 import com.example.swimminganalysisapplication.ui.analysis.SingleAnalysisResultScreen
 import com.example.swimminganalysisapplication.ui.analysis.SingleAnalysisResultViewModelFactory
 import com.example.swimminganalysisapplication.ui.analysis.SingleAnalysisSetupScreen
@@ -58,6 +61,7 @@ class MainActivity : ComponentActivity() {
     private val singleAnalysisSetupViewModelFactory: SingleAnalysisSetupViewModelFactory by lazy { SingleAnalysisSetupViewModelFactory(swimmingRepository, userPreferences) }
     private val practiceListViewModelFactory: PracticeListViewModelFactory by lazy { PracticeListViewModelFactory(swimmingRepository) }
     private val discoverViewModelFactory: DiscoverViewModelFactory by lazy { DiscoverViewModelFactory(swimmingRepository) }
+    private val analysisViewModelFactory: AnalysisViewModelFactory by lazy { AnalysisViewModelFactory(swimmingRepository) }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -196,8 +200,24 @@ class MainActivity : ComponentActivity() {
                             route = AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE
                         ) {
                             AnalysisListScreen(
-                                navController = navController
+                                navController = navController,
+                                viewModel = viewModel(factory = analysisViewModelFactory)
                             )
+                        }
+                        composable(
+                            route = "${AppDestinations.ANALYSIS_DETAIL_SCREEN_ROUTE}/{videoId}",
+                            arguments = listOf(navArgument("videoId") { type = NavType.IntType })
+                        ) { backStackEntry ->
+                            val videoId = backStackEntry.arguments?.getInt("videoId")
+                            if (videoId != null) {
+                                AnalysisDetailScreen(
+                                    videoId = videoId,
+                                    navController = navController,
+                                    viewModel = viewModel(factory = analysisViewModelFactory)
+                                )
+                            } else {
+                                navController.popBackStack()
+                            }
                         }
                         composable(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE) {
                             SingleAnalysisSetupScreen(

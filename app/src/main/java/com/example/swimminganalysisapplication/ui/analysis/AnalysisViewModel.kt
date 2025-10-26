@@ -25,9 +25,6 @@ class AnalysisViewModel(
     private val _selectedAnalysisDetail = MutableStateFlow<AnalysisDetail?>(null)
     val selectedAnalysisDetail: StateFlow<AnalysisDetail?> = _selectedAnalysisDetail
 
-    private val _showDetailDialog = MutableStateFlow(false)
-    val showDetailDialog: StateFlow<Boolean> = _showDetailDialog
-
     init {
         loadVideos()
     }
@@ -55,18 +52,12 @@ class AnalysisViewModel(
                 val gson = Gson()
                 val detail = gson.fromJson(mockJsonString, AnalysisDetail::class.java)
                 _selectedAnalysisDetail.value = detail
-                _showDetailDialog.value = true
                 Log.i("AnalysisViewModel", "Successfully parsed mock JSON for video ${videoId}")
             } catch (e: Exception) {
                 _errorMessage.value = "分析詳細(JSON)の解析中にエラーが発生しました: ${e.message}"
                 Log.e("AnalysisViewModel", "Error parsing mock JSON for video ${videoId}", e)
             }
         }
-    }
-
-    fun dismissDetailDialog() {
-        _showDetailDialog.value = false
-        _selectedAnalysisDetail.value = null
     }
 
     private fun loadVideos() {

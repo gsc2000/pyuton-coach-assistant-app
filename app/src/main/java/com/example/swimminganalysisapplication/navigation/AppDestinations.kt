@@ -20,5 +20,6 @@ object AppDestinations {
     const val SINGLE_ANALYSIS_SETUP_ROUTE = "single_analysis_setup_screen"
     const val ANALYSIS_PROGRESS_ROUTE = "analysis_progress_screen"
     const val SINGLE_ANALYSIS_RESULT_ROUTE = "single_analysis_result_screen"
-}
 
+    const val ANALYSIS_DETAIL_SCREEN_ROUTE = "analysis_detail_screen"
+}
