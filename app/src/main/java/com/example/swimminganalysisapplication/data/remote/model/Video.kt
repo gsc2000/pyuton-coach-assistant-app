@@ -3,16 +3,16 @@ package com.example.swimminganalysisapplication.data.remote.model
 import com.google.gson.annotations.SerializedName
 
 data class Video(
-    @SerializedName("video_id")
+    @SerializedName("videoId")
     val videoId: Int,
-    @SerializedName("video_title")
-    val videoTitle: String,
-    @SerializedName("video_is_pose")
-    val videoIsPose: Boolean,
-    @SerializedName("video_uuid")
+    @SerializedName("videoTitle")
+    val videoTitle: String?,
+    @SerializedName("videoIsPose")
+    val videoIsPose: Boolean?,
+    @SerializedName("videoUuid")
     val videoUuid: String,
-    @SerializedName("video_uploaded_at")
+    @SerializedName("videoUploadedAt")
     val videoUploadedAt: String,
-    @SerializedName("user_id")
+    @SerializedName("userId")
     val userId: Int
 )

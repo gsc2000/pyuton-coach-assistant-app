@@ -66,7 +66,7 @@ fun AnalysisListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = "分析結果一覧") },
+                title = { Text(text = "ビデオ一覧") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
@@ -100,7 +100,7 @@ fun AnalysisListScreen(
                 )
             } else if (videos.isEmpty()) {
                 Text(
-                    text = "分析結果がありません。",
+                    text = "ビデオがありません。",
                     modifier = Modifier.align(Alignment.Center)
                 )
             } else {
