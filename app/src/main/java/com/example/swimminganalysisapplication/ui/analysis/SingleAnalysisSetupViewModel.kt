@@ -10,14 +10,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.model.JobRequest
-import com.example.swimminganalysisapplication.data.remote.model.JobResponse
 import com.example.swimminganalysisapplication.data.remote.model.Player
 import com.example.swimminganalysisapplication.data.remote.model.PlayerCreate
+import com.example.swimminganalysisapplication.data.remote.model.VideoCreate
 import com.example.swimminganalysisapplication.data.storage.UserPreferences
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -53,18 +56,13 @@ class SingleAnalysisSetupViewModel(
     var isSearching by mutableStateOf(false)
         private set
 
-    var isLoading by mutableStateOf(false)
-        private set
+    private val _uiState = MutableStateFlow<AnalysisUiState>(AnalysisUiState.Idle)
+    val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
 
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
     private var searchJob: Job? = null
-
-    // ★★★ 解析結果のイベント名を JobResponse に変更 ★★★
-    private val _jobStartedEvent = MutableSharedFlow<JobResponse>()
-    val jobStartedEvent = _jobStartedEvent.asSharedFlow()
-
 
     private val _navigationEvent = MutableSharedFlow<NavigationEvent>()
     val navigationEvent = _navigationEvent.asSharedFlow()
@@ -93,7 +91,6 @@ class SingleAnalysisSetupViewModel(
 
     fun onPlayerSelected(player: Player) {
         selectedPlayer = player
-        // ★★★ null許容に対応 ★★★
         playerSearchText = player.playerName ?: ""
         players = emptyList()
     }
@@ -126,7 +123,6 @@ class SingleAnalysisSetupViewModel(
                 val newPlayer = repository.createPlayer(PlayerCreate(playerName = playerName, userId = userId))
                 if (newPlayer != null) {
                     selectedPlayer = newPlayer
-                    // ★★★ null許容に対応 ★★★
                     playerSearchText = newPlayer.playerName ?: ""
                     players = emptyList()
                 }
@@ -142,18 +138,25 @@ class SingleAnalysisSetupViewModel(
         }
     }
 
-    // ★★★ startAnalysisメソッドを正しいAPIフローに全面的に修正 ★★★
     fun startAnalysis(context: Context) {
         if (videoUri == null) {
             errorMessage = "動画を選択してください。"
             return
         }
+        if (selectedPlayer == null) {
+            errorMessage = "選手を選択してください。"
+            return
+        }
 
         viewModelScope.launch {
-            isLoading = true
+            _uiState.value = AnalysisUiState.Loading("解析準備中...")
             errorMessage = null
+
             try {
-                // --- ステップ1: 動画をアップロード ---
+                val userId = userPreferences.userId.first() ?: throw Exception("ユーザーIDが取得できませんでした。")
+
+                // Step 1: Upload Video
+                _uiState.value = AnalysisUiState.Loading("動画をアップロード中...")
                 val videoFile = videoUri?.let { uri ->
                     context.contentResolver.openInputStream(uri)?.use { inputStream ->
                         val file = File(context.cacheDir, "upload_${System.currentTimeMillis()}.mp4")
@@ -167,25 +170,55 @@ class SingleAnalysisSetupViewModel(
 
                 val uploadResponse = repository.uploadVideo(videoPart)
                     ?: throw Exception("動画のアップロードに失敗しました。サーバーからの応答がありません。")
-
                 Log.d("SingleAnalysisSetupVM", "Video uploaded. File ID: ${uploadResponse.id}")
 
-                // --- ステップ2: 解析ジョブを開始 ---
-                val jobRequest = JobRequest(fileId = uploadResponse.id)
+//                // Step 2: Create Video Object (Temporarily Skipped)
+//                val videoToCreate = VideoCreate(
+//                    videoTitle = comment.ifBlank { "新しいビデオ" }, // commentが空ならデフォルトタイトル
+//                    userId = userId,
+//                    videoUuid = uploadResponse.id
+//                )
+//                val createdVideo = repository.createVideo(videoToCreate)
+//                    ?: throw Exception("Videoオブジェクトの作成に失敗しました。")
+//                Log.d("SingleAnalysisSetupVM", "Video object created. ID: ${createdVideo.videoId}")
 
+                // Step 3: Start Inference Job
+                _uiState.value = AnalysisUiState.Loading("解析ジョブを開始中...")
+                val jobRequest = JobRequest(fileId = uploadResponse.id)
                 val jobResponse = repository.startInferenceJob(jobRequest)
                     ?: throw Exception("解析ジョブの作成に失敗しました。")
-
                 Log.d("SingleAnalysisSetupVM", "Inference job started. Job ID: ${jobResponse.jobId}")
 
-                // --- ステップ3: 成功イベントを通知 ---
-                _jobStartedEvent.emit(jobResponse)
+                // Step 4: Poll Job Status
+                _uiState.value = AnalysisUiState.Loading("解析中...")
+                var jobStatus = repository.getJobStatus(jobResponse.jobId)
+                while (jobStatus?.status != "completed" && jobStatus?.status != "failed") {
+                    delay(5000) // 5秒待機
+                    jobStatus = repository.getJobStatus(jobResponse.jobId)
+                    Log.d("SingleAnalysisSetupVM", "Polling job status: ${jobStatus?.status}")
+                }
+
+                // Step 5 & 6: Handle Completion
+                when (jobStatus?.status) {
+                    "completed" -> {
+                        _uiState.value = AnalysisUiState.Success("解析が完了しました！")
+                        // ここで解析結果画面への遷移などの処理を呼び出す
+                        // _navigationEvent.emit(NavigationEvent.NavigateToResultScreen(jobResponse.jobId))
+                    }
+                    "failed" -> {
+                        throw Exception("解析に失敗しました。詳細: ${jobStatus.detail}")
+                    }
+                    else -> {
+                        throw Exception("不明な解析ステータスです: ${jobStatus?.status}")
+                    }
+                }
 
             } catch (e: Exception) {
                 errorMessage = e.message ?: "不明なエラーが発生しました。"
+                _uiState.value = AnalysisUiState.Error(errorMessage!!)
                 Log.e("SingleAnalysisSetupVM", "Analysis failed", e)
             } finally {
-                isLoading = false
+                // ローディング状態は各ステップで管理されるため、ここではIdleに戻さない
             }
         }
     }
@@ -193,4 +226,12 @@ class SingleAnalysisSetupViewModel(
 
 sealed class NavigationEvent {
     object NavigateToAnalysisList : NavigationEvent()
+    // data class NavigateToResultScreen(val jobId: String) : NavigationEvent()
+}
+
+sealed class AnalysisUiState {
+    object Idle : AnalysisUiState()
+    data class Loading(val message: String) : AnalysisUiState()
+    data class Success(val message: String) : AnalysisUiState()
+    data class Error(val message: String) : AnalysisUiState()
 }

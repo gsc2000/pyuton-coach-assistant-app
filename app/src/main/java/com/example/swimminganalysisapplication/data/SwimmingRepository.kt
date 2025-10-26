@@ -96,11 +96,13 @@ class SwimmingRepository(private val apiService: ApiService) {
         return handleResponse({ apiService.uploadVideo(videoFile) }, "uploadVideo")
     }
 
-    // ★★★ ここから追加 ★★★
     suspend fun startInferenceJob(jobRequest: JobRequest): JobResponse? {
         return handleResponse({ apiService.inferenceJob(jobRequest) }, "startInferenceJob")
     }
-    // ★★★ ここまで追加 ★★★
+
+    suspend fun getJobStatus(jobId: String): JobStatus? {
+        return handleResponse({ apiService.getJobStatus(jobId) }, "getJobStatus")
+    }
 
     // --- Other Endpoints ---
     suspend fun getMenuChats(menuId: String): List<Chat>? {
@@ -112,7 +114,7 @@ class SwimmingRepository(private val apiService: ApiService) {
     suspend fun getChats(): List<Chat>? = handleResponse({ apiService.getChats() }, "getChats")
     suspend fun createFavorite(favorite: Favorite): Favorite? = handleResponse({ apiService.createFavorite(favorite) }, "createFavorite")
     suspend fun getFavorites(): List<Favorite>? = handleResponse({ apiService.getFavorites() }, "getFavorites")
-    suspend fun createVideo(video: Video): Video? = handleResponse({ apiService.createVideo(video) }, "createVideo")
+    suspend fun createVideo(video: VideoCreate): Video? = handleResponse({ apiService.createVideo(video) }, "createVideo")
     suspend fun getVideos(): List<Video>? = handleResponse({ apiService.getVideos() }, "getVideos")
     suspend fun createAnalysis(analysis: Analysis): Analysis? = handleResponse({ apiService.createAnalysis(analysis) }, "createAnalysis")
     suspend fun getAnalyses(): List<Analysis>? = handleResponse({ apiService.getAnalyses() }, "getAnalyses")

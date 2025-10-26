@@ -8,6 +8,7 @@ import com.example.swimminganalysisapplication.data.remote.model.ChatThread
 import com.example.swimminganalysisapplication.data.remote.model.Favorite
 import com.example.swimminganalysisapplication.data.remote.model.JobRequest
 import com.example.swimminganalysisapplication.data.remote.model.JobResponse
+import com.example.swimminganalysisapplication.data.remote.model.JobStatus
 import com.example.swimminganalysisapplication.data.remote.model.Menu
 import com.example.swimminganalysisapplication.data.remote.model.Player
 import com.example.swimminganalysisapplication.data.remote.model.PlayerCreate
@@ -16,6 +17,7 @@ import com.example.swimminganalysisapplication.data.remote.model.User
 import com.example.swimminganalysisapplication.data.remote.model.UserCreate
 import com.example.swimminganalysisapplication.data.remote.model.UserLogin
 import com.example.swimminganalysisapplication.data.remote.model.Video
+import com.example.swimminganalysisapplication.data.remote.model.VideoCreate
 import com.example.swimminganalysisapplication.data.remote.model.VideoUploadResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -99,6 +101,9 @@ interface ApiService {
     @POST("/api/v1/job/inference")
     suspend fun inferenceJob(@Body jobRequest: JobRequest): Response<JobResponse>
 
+    @GET("/api/v1/job/status/{job_id}")
+    suspend fun getJobStatus(@Path("job_id") jobId: String): Response<JobStatus>
+
     // --- Other Endpoints (パスを修正) ---
     @POST("/api/v1/chats/")
     suspend fun createChat(@Body chat: ChatCreate): Response<Chat>
@@ -113,7 +118,7 @@ interface ApiService {
     suspend fun getFavorites(): Response<List<Favorite>>
 
     @POST("/api/v1/videos/")
-    suspend fun createVideo(@Body video: Video): Response<Video>
+    suspend fun createVideo(@Body video: VideoCreate): Response<Video>
 
     @GET("/api/v1/videos/")
     suspend fun getVideos(): Response<List<Video>>

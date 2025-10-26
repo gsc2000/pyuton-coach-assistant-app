@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Player
 import com.example.swimminganalysisapplication.navigation.AppDestinations
@@ -47,14 +48,13 @@ fun SingleAnalysisSetupScreen(
     val playerSearchText by remember { derivedStateOf { viewModel.playerSearchText } }
     val players by remember { derivedStateOf { viewModel.players } }
     val isSearching by remember { derivedStateOf { viewModel.isSearching } }
-    val isLoading by remember { derivedStateOf { viewModel.isLoading } }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val errorMessage by remember { derivedStateOf { viewModel.errorMessage } }
     val context = LocalContext.current
 
     var showVideoSourceDialog by remember { mutableStateOf(false) }
     var tempVideoUri by remember { mutableStateOf<Uri?>(null) }
 
-    // --- カメラ撮影用ランチャー ---
     val videoCaptureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CaptureVideo()
     ) { success: Boolean ->
@@ -65,12 +65,10 @@ fun SingleAnalysisSetupScreen(
         }
     }
 
-    // --- 権限要求用ランチャー ---
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            // 権限が許可されたので、カメラを起動する
             val videoFile = File(context.cacheDir, "capture_${System.currentTimeMillis()}.mp4")
             val uri = FileProvider.getUriForFile(
                 Objects.requireNonNull(context),
@@ -80,16 +78,24 @@ fun SingleAnalysisSetupScreen(
             tempVideoUri = uri
             videoCaptureLauncher.launch(uri)
         } else {
-            // 権限が拒否された場合
             Toast.makeText(context, "カメラの権限が拒否されました。", Toast.LENGTH_SHORT).show()
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.jobStartedEvent.collectLatest { jobResponse ->
-            Toast.makeText(context, "解析ジョブを開始しました: ${jobResponse.jobId}", Toast.LENGTH_SHORT).show()
-            navController.popBackStack()
+    LaunchedEffect(uiState) {
+        when (val state = uiState) {
+            is AnalysisUiState.Success -> {
+                Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
+                navController.popBackStack() // Or navigate to result screen
+            }
+            is AnalysisUiState.Error -> {
+                // Error messages are now handled by the errorMessage state
+            }
+            else -> Unit
         }
+    }
+
+    LaunchedEffect(Unit) {
         viewModel.navigationEvent.collectLatest { event ->
             when (event) {
                 is NavigationEvent.NavigateToAnalysisList -> {
@@ -99,7 +105,6 @@ fun SingleAnalysisSetupScreen(
         }
     }
 
-    // ギャラリー用ランチャー
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -165,9 +170,13 @@ fun SingleAnalysisSetupScreen(
 
                 Button(
                     onClick = { viewModel.startAnalysis(context) },
-                    enabled = videoUri != null && selectedPlayer != null && !isLoading
+                    enabled = videoUri != null && selectedPlayer != null && uiState !is AnalysisUiState.Loading
                 ) {
-                    Text("解析開始")
+                    if (uiState is AnalysisUiState.Loading) {
+                        Text((uiState as AnalysisUiState.Loading).message)
+                    } else {
+                        Text("解析開始")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -179,13 +188,23 @@ fun SingleAnalysisSetupScreen(
                 }
             }
 
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            if (uiState is AnalysisUiState.Loading) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text((uiState as AnalysisUiState.Loading).message)
+                        }
+                    }
+                }
             }
         }
     }
 
-    // --- 修正されたダイアログ ---
     if (showVideoSourceDialog) {
         Dialog(onDismissRequest = { showVideoSourceDialog = false }) {
             Card(
@@ -216,13 +235,11 @@ fun SingleAnalysisSetupScreen(
                     Button(
                         onClick = {
                             showVideoSourceDialog = false
-                            // --- 権限チェックと要求 ---
                             when (PackageManager.PERMISSION_GRANTED) {
                                 ContextCompat.checkSelfPermission(
                                     context,
                                     Manifest.permission.CAMERA
                                 ) -> {
-                                    // 権限がすでに許可されている場合、カメラを起動
                                     val videoFile = File(context.cacheDir, "capture_${System.currentTimeMillis()}.mp4")
                                     val uri = FileProvider.getUriForFile(
                                         Objects.requireNonNull(context),
@@ -233,7 +250,6 @@ fun SingleAnalysisSetupScreen(
                                     videoCaptureLauncher.launch(uri)
                                 }
                                 else -> {
-                                    // 権限がないので、許可を要求する
                                     permissionLauncher.launch(Manifest.permission.CAMERA)
                                 }
                             }
@@ -251,7 +267,6 @@ fun SingleAnalysisSetupScreen(
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
