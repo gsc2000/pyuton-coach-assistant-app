@@ -297,25 +297,28 @@ fun VideoScreen(navController: NavController) {
         }
     }
 
-    lateinit var requestCameraPermissionLauncher1: ActivityResultLauncher<String>
-    lateinit var requestStoragePermissionLauncher1: ActivityResultLauncher<String>
-    lateinit var requestCameraPermissionLauncher2: ActivityResultLauncher<String>
-    lateinit var requestStoragePermissionLauncher2: ActivityResultLauncher<String>
-
-    requestCameraPermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) launchCameraAction(context, 1, takeVideoLauncher1, takeVideoLauncher2, requestCameraPermissionLauncher1, requestCameraPermissionLauncher2)
+    val requestCameraPermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) {
+            val takeVideoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
+            if (takeVideoIntent.resolveActivity(context.packageManager) != null) takeVideoLauncher1.launch(takeVideoIntent)
+            else Log.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video 1")
+        }
         else Log.w(TAG, "Camera permission denied for video 1")
     }
-    requestStoragePermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) launchGalleryAction(context, 1, selectVideoLauncher1, selectVideoLauncher2, requestStoragePermissionLauncher1, requestStoragePermissionLauncher2)
+    val requestStoragePermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) selectVideoLauncher1.launch("video/*")
         else Log.w(TAG, "Storage permission denied for video 1")
     }
-    requestCameraPermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) launchCameraAction(context, 2, takeVideoLauncher1, takeVideoLauncher2, requestCameraPermissionLauncher1, requestCameraPermissionLauncher2)
+    val requestCameraPermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) {
+            val takeVideoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
+            if (takeVideoIntent.resolveActivity(context.packageManager) != null) takeVideoLauncher2.launch(takeVideoIntent)
+            else Log.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video 2")
+        }
         else Log.w(TAG, "Camera permission denied for video 2")
     }
-    requestStoragePermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) launchGalleryAction(context, 2, selectVideoLauncher1, selectVideoLauncher2, requestStoragePermissionLauncher1, requestStoragePermissionLauncher2)
+    val requestStoragePermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) selectVideoLauncher2.launch("video/*")
         else Log.w(TAG, "Storage permission denied for video 2")
     }
 
