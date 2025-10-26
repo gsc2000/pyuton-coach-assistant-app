@@ -14,11 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,8 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.RetrofitClient
-import com.example.swimminganalysisapplication.data.remote.model.Analysis
 import com.example.swimminganalysisapplication.data.remote.model.AnalysisDetail
+import com.example.swimminganalysisapplication.data.remote.model.Video
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,7 +51,7 @@ fun AnalysisListScreen(
     val viewModel: AnalysisViewModel = viewModel(
         factory = AnalysisViewModelFactory(repository)
     )
-    val analysisResults by viewModel.analysisResults.collectAsState()
+    val videos by viewModel.videos.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val selectedAnalysisDetail by viewModel.selectedAnalysisDetail.collectAsState()
     val showDetailDialog by viewModel.showDetailDialog.collectAsState()
@@ -100,18 +98,18 @@ fun AnalysisListScreen(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.align(Alignment.Center)
                 )
-            } else if (analysisResults.isEmpty()) {
+            } else if (videos.isEmpty()) {
                 Text(
                     text = "分析結果がありません。",
                     modifier = Modifier.align(Alignment.Center)
                 )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(analysisResults) { result ->
-                        AnalysisItem(
-                            result = result,
+                    items(videos) { video ->
+                        VideoItem(
+                            video = video,
                             onItemClick = {
-                                viewModel.fetchAnalysisJson(result)
+                                viewModel.fetchAnalysisJson(video.videoId)
                             }
                         )
                     }
@@ -122,7 +120,7 @@ fun AnalysisListScreen(
 }
 
 @Composable
-fun AnalysisItem(result: Analysis, onItemClick: () -> Unit) {
+fun VideoItem(video: Video, onItemClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -130,12 +128,10 @@ fun AnalysisItem(result: Analysis, onItemClick: () -> Unit) {
             .clickable(onClick = onItemClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "分析ID: ${result.analysisId}", style = MaterialTheme.typography.titleMedium)
-            Text(text = "ユーザーID: ${result.userId}")
-            Text(text = "ビデオ1 ID: ${result.video1Id}")
-            result.video2Id?.let {
-                Text(text = "ビデオ2 ID: $it")
-            }
+            Text(text = "ビデオID: ${video.videoId}", style = MaterialTheme.typography.titleMedium)
+            Text(text = "タイトル: ${video.videoTitle ?: "(タイトルなし)"}")
+            Text(text = "ユーザーID: ${video.userId}")
+            Text(text = "アップロード日時: ${video.videoUploadedAt}")
         }
     }
 }

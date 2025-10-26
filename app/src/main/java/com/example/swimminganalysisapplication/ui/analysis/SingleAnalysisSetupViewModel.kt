@@ -68,7 +68,8 @@ class SingleAnalysisSetupViewModel(
     val navigationEvent = _navigationEvent.asSharedFlow()
 
     init {
-        loadPlayers()
+        // Initial load can be removed if you want to load only on focus
+        // loadPlayers()
     }
 
     fun onVideoSelected(uri: Uri?) {
@@ -89,6 +90,13 @@ class SingleAnalysisSetupViewModel(
         }
     }
 
+    fun onPlayerSearchFocused() {
+        // Load all players for the current user when the search box is focused
+        if (players.isEmpty() && playerSearchText.isEmpty()) {
+            loadPlayers()
+        }
+    }
+
     fun onPlayerSelected(player: Player) {
         selectedPlayer = player
         playerSearchText = player.playerName ?: ""
@@ -103,9 +111,17 @@ class SingleAnalysisSetupViewModel(
         viewModelScope.launch {
             isSearching = true
             try {
-                players = repository.getPlayers(query) ?: emptyList()
+                val allPlayers = repository.getPlayers(query) ?: emptyList()
+                val userId = userPreferences.userId.first()
+                if (userId != null) {
+                    players = allPlayers.filter { it.userId == userId }
+                } else {
+                    errorMessage = "ユーザー情報が取得できませんでした。再度ログインしてください。"
+                    players = emptyList() // Clear list if user is not logged in
+                }
             } catch (e: Exception) {
                 errorMessage = "選手の読み込みに失敗しました: ${e.message}"
+                players = emptyList()
             } finally {
                 isSearching = false
             }
@@ -172,15 +188,15 @@ class SingleAnalysisSetupViewModel(
                     ?: throw Exception("動画のアップロードに失敗しました。サーバーからの応答がありません。")
                 Log.d("SingleAnalysisSetupVM", "Video uploaded. File ID: ${uploadResponse.id}")
 
-//                // Step 2: Create Video Object (Temporarily Skipped)
-//                val videoToCreate = VideoCreate(
-//                    videoTitle = comment.ifBlank { "新しいビデオ" }, // commentが空ならデフォルトタイトル
-//                    userId = userId,
-//                    videoUuid = uploadResponse.id
-//                )
-//                val createdVideo = repository.createVideo(videoToCreate)
-//                    ?: throw Exception("Videoオブジェクトの作成に失敗しました。")
-//                Log.d("SingleAnalysisSetupVM", "Video object created. ID: ${createdVideo.videoId}")
+                // Step 2: Create Video Object
+                val videoToCreate = VideoCreate(
+                    videoTitle = comment.ifBlank { "新しいビデオ" }, // commentが空ならデフォルトタイトル
+                    userId = userId,
+                    videoUuid = uploadResponse.id
+                )
+                val createdVideo = repository.createVideo(videoToCreate)
+                    ?: throw Exception("Videoオブジェクトの作成に失敗しました。")
+                Log.d("SingleAnalysisSetupVM", "Video object created. ID: ${createdVideo.videoId}")
 
                 // Step 3: Start Inference Job
                 _uiState.value = AnalysisUiState.Loading("解析ジョブを開始中...")

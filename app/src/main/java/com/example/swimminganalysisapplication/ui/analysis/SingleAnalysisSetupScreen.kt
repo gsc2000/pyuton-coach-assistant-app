@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
@@ -150,6 +151,7 @@ fun SingleAnalysisSetupScreen(
                 PlayerSearch(
                     searchText = playerSearchText,
                     onSearchTextChange = { viewModel.onPlayerSearchTextChange(it) },
+                    onPlayerSearchFocused = { viewModel.onPlayerSearchFocused() },
                     players = players,
                     onPlayerSelected = { viewModel.onPlayerSelected(it) },
                     onAddNewPlayer = { viewModel.addNewPlayer(it) },
@@ -273,6 +275,7 @@ fun SingleAnalysisSetupScreen(
 fun PlayerSearch(
     searchText: String,
     onSearchTextChange: (String) -> Unit,
+    onPlayerSearchFocused: () -> Unit,
     players: List<Player>,
     onPlayerSelected: (Player) -> Unit,
     onAddNewPlayer: (String) -> Unit,
@@ -304,7 +307,14 @@ fun PlayerSearch(
                 expanded = true
             },
             label = { Text("選手を検索") },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged {
+                    if (it.isFocused) {
+                        onPlayerSearchFocused()
+                        expanded = true
+                    }
+                },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
         )

@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import android.util.Log
 import com.example.swimminganalysisapplication.data.ApiException
 import com.example.swimminganalysisapplication.data.SwimmingRepository
-import com.example.swimminganalysisapplication.data.remote.model.Analysis
 import com.example.swimminganalysisapplication.data.remote.model.AnalysisDetail
+import com.example.swimminganalysisapplication.data.remote.model.Video
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +16,8 @@ class AnalysisViewModel(
     private val repository: SwimmingRepository
 ) : ViewModel() {
 
-    private val _analysisResults = MutableStateFlow<List<Analysis>>(emptyList())
-    val analysisResults: StateFlow<List<Analysis>> = _analysisResults
+    private val _videos = MutableStateFlow<List<Video>>(emptyList())
+    val videos: StateFlow<List<Video>> = _videos
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
@@ -29,16 +29,16 @@ class AnalysisViewModel(
     val showDetailDialog: StateFlow<Boolean> = _showDetailDialog
 
     init {
-        loadAnalysisResults()
+        loadVideos()
     }
 
-    fun fetchAnalysisJson(analysis: Analysis) {
+    fun fetchAnalysisJson(videoId: Int) {
         viewModelScope.launch {
             // TODO: Replace this mock implementation with actual API call
             val mockJsonString = """
             {
-                "analysis_id": ${analysis.analysisId},
-                "video_name": "mock_video_${analysis.analysisId}.mp4",
+                "analysis_id": ${videoId},
+                "video_name": "mock_video_${videoId}.mp4",
                 "analysis_date": "2025-09-14",
                 "total_time": 125.5,
                 "total_stroke_count": 64,
@@ -56,10 +56,10 @@ class AnalysisViewModel(
                 val detail = gson.fromJson(mockJsonString, AnalysisDetail::class.java)
                 _selectedAnalysisDetail.value = detail
                 _showDetailDialog.value = true
-                Log.i("AnalysisViewModel", "Successfully parsed mock JSON for analysis ${analysis.analysisId}")
+                Log.i("AnalysisViewModel", "Successfully parsed mock JSON for video ${videoId}")
             } catch (e: Exception) {
                 _errorMessage.value = "分析詳細(JSON)の解析中にエラーが発生しました: ${e.message}"
-                Log.e("AnalysisViewModel", "Error parsing mock JSON for analysis ${analysis.analysisId}", e)
+                Log.e("AnalysisViewModel", "Error parsing mock JSON for video ${videoId}", e)
             }
         }
     }
@@ -69,21 +69,12 @@ class AnalysisViewModel(
         _selectedAnalysisDetail.value = null
     }
 
-    private fun loadAnalysisResults() {
+    private fun loadVideos() {
         viewModelScope.launch {
-            // TODO: Replace this mock implementation with actual API call
-            _analysisResults.value = listOf(
-                Analysis(analysisId = 1, video1Id = 101, video2Id = 102, userId = 1, videoCompareAnalysisJsonPath = "/path/to/json1.json", menuId = 1, status = "SUCCESS"),
-                Analysis(analysisId = 2, video1Id = 103, video2Id = null, userId = 1, videoCompareAnalysisJsonPath = "/path/to/json2.json", menuId = 1, status = "PROCESSING"),
-                Analysis(analysisId = 3, video1Id = 104, video2Id = 105, userId = 2, videoCompareAnalysisJsonPath = "/path/to/json3.json", menuId = 2, status = "FAILURE")
-            )
-            /*
             try {
-                val results = repository.getAnalyses()
+                val results = repository.getVideos()
                 if (results != null) {
-                    // TODO: The Analysis model does not have playerId.
-                    // Filtering logic will be implemented in the next step.
-                    _analysisResults.value = results
+                    _videos.value = results
                 } else {
                     _errorMessage.value = "分析結果の取得に失敗しました。"
                 }
@@ -92,7 +83,6 @@ class AnalysisViewModel(
             } catch (e: Exception) {
                 _errorMessage.value = "予期せぬエラーが発生しました: ${e.message}"
             }
-            */
         }
     }
 }
