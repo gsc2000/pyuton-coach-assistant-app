@@ -1,12 +1,17 @@
 package com.example.swimminganalysisapplication.data
 
+import android.content.Context
 import android.util.Log
 import com.example.swimminganalysisapplication.data.remote.ApiService
 import com.example.swimminganalysisapplication.data.remote.model.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
+import java.io.File
+import java.io.FileOutputStream
 
 class SwimmingRepository(private val apiService: ApiService) {
 
@@ -102,6 +107,37 @@ class SwimmingRepository(private val apiService: ApiService) {
 
     suspend fun getJobStatus(jobId: String): JobStatus? {
         return handleResponse({ apiService.getJobStatus(jobId) }, "getJobStatus")
+    }
+
+    suspend fun getResultVideo(context: Context, videoUuid: String): File? {
+        val cacheDir = context.cacheDir
+        val videoFile = File(cacheDir, "result_video_$videoUuid.mp4")
+
+        if (videoFile.exists()) {
+            Log.i("SwimmingRepository", "Result video for $videoUuid found in cache.")
+            return videoFile
+        }
+
+        return try {
+            val response = apiService.downloadResultVideo(videoUuid)
+            if (response.isSuccessful) {
+                response.body()?.let {
+                    withContext(Dispatchers.IO) {
+                        it.byteStream().use { input ->
+                            FileOutputStream(videoFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        Log.i("SwimmingRepository", "Result video for $videoUuid downloaded and cached.")
+                        videoFile
+                    }
+                }
+            } else {
+                throw ApiException("動画のダウンロードに失敗しました: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            throw ApiException("動画のダウンロード中に例外が発生しました: ${e.message}")
+        }
     }
 
     // --- Other Endpoints ---

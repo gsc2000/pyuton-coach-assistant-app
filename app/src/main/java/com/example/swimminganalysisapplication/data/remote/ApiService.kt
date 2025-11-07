@@ -32,6 +32,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 import retrofit2.http.Url
 
 /**
@@ -103,6 +104,11 @@ interface ApiService {
 
     @GET("/api/v1/job/status/{job_id}")
     suspend fun getJobStatus(@Path("job_id") jobId: String): Response<JobStatus>
+
+    // --- Download Endpoint ---
+    @Streaming
+    @GET("/api/v1/download/result_video/{video_uuid}")
+    suspend fun downloadResultVideo(@Path("video_uuid") videoUuid: String): Response<ResponseBody>
 
     // --- Other Endpoints (パスを修正) ---
     @POST("/api/v1/chats/")

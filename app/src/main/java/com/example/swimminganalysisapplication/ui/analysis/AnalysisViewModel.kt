@@ -1,5 +1,7 @@
 package com.example.swimminganalysisapplication.ui.analysis
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.util.Log
@@ -10,7 +12,15 @@ import com.example.swimminganalysisapplication.data.remote.model.Video
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+data class AnalysisDetailUiState(
+    val videoUri: Uri? = null,
+    val analysisDetail: AnalysisDetail? = null,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
 
 class AnalysisViewModel(
     private val repository: SwimmingRepository
@@ -22,43 +32,54 @@ class AnalysisViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
-    private val _selectedAnalysisDetail = MutableStateFlow<AnalysisDetail?>(null)
-    val selectedAnalysisDetail: StateFlow<AnalysisDetail?> = _selectedAnalysisDetail
+    private val _analysisDetailState = MutableStateFlow(AnalysisDetailUiState())
+    val analysisDetailState: StateFlow<AnalysisDetailUiState> = _analysisDetailState.asStateFlow()
+
 
     init {
         loadVideos()
     }
 
-    fun fetchAnalysisJson(videoId: Int) {
+    fun loadAnalysisDetails(context: Context, videoId: Int, videoUuid: String) {
         viewModelScope.launch {
-            // TODO: Replace this mock implementation with actual API call
-            val mockJsonString = """
-            {
-                "analysis_id": ${videoId},
-                "video_name": "mock_video_${videoId}.mp4",
-                "analysis_date": "2025-09-14",
-                "total_time": 125.5,
-                "total_stroke_count": 64,
-                "lap_times": [
-                    { "lap_number": 1, "lap_time": 29.8, "stroke_count": 15 },
-                    { "lap_number": 2, "lap_time": 31.2, "stroke_count": 16 },
-                    { "lap_number": 3, "lap_time": 32.0, "stroke_count": 17 },
-                    { "lap_number": 4, "lap_time": 32.5, "stroke_count": 16 }
-                ]
-            }
-            """.trimIndent()
-
+            _analysisDetailState.value = AnalysisDetailUiState(isLoading = true)
             try {
-                val gson = Gson()
-                val detail = gson.fromJson(mockJsonString, AnalysisDetail::class.java)
-                _selectedAnalysisDetail.value = detail
-                Log.i("AnalysisViewModel", "Successfully parsed mock JSON for video ${videoId}")
+                // Mock JSON data (as API for this is not ready)
+                val mockJsonString = """
+                {
+                    "analysis_id": ${videoId},
+                    "video_name": "result_video_${videoId}.mp4",
+                    "analysis_date": "2025-10-27",
+                    "total_time": 130.2,
+                    "total_stroke_count": 68,
+                    "lap_times": [
+                        { "lap_number": 1, "lap_time": 30.1, "stroke_count": 16 },
+                        { "lap_number": 2, "lap_time": 32.5, "stroke_count": 17 },
+                        { "lap_number": 3, "lap_time": 33.4, "stroke_count": 18 },
+                        { "lap_number": 4, "lap_time": 34.2, "stroke_count": 17 }
+                    ]
+                }
+                """.trimIndent()
+                val analysisDetail = Gson().fromJson(mockJsonString, AnalysisDetail::class.java)
+
+                // Fetch video
+                val videoFile = repository.getResultVideo(context, videoUuid)
+
+                _analysisDetailState.value = AnalysisDetailUiState(
+                    videoUri = videoFile?.let { Uri.fromFile(it) },
+                    analysisDetail = analysisDetail,
+                    isLoading = false
+                )
             } catch (e: Exception) {
-                _errorMessage.value = "分析詳細(JSON)の解析中にエラーが発生しました: ${e.message}"
-                Log.e("AnalysisViewModel", "Error parsing mock JSON for video ${videoId}", e)
+                Log.e("AnalysisViewModel", "Failed to load analysis details", e)
+                _analysisDetailState.value = AnalysisDetailUiState(
+                    isLoading = false,
+                    errorMessage = "詳細の読み込みに失敗しました: ${e.message}"
+                )
             }
         }
     }
+
 
     private fun loadVideos() {
         viewModelScope.launch {

@@ -531,31 +531,6 @@ fun VideoScreen(navController: NavController) {
                 title = { Text("動画比較 & 解析") },
                 navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
                 actions = {
-                    Button(
-                        onClick = { /* TODO: Navigate to Analysis Creation Screen */ },
-                        enabled = exoPlayer1 != null || exoPlayer2 != null
-                    ) {
-                        Text("解析")
-                    }
-                    IconButton(onClick = { navController.navigate(AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE) }) {
-                        Icon(Icons.Filled.Assessment, "分析結果一覧")
-                    }
-                    IconButton(onClick = {
-// ...existing code...
-                        val encodedUri1 = videoUri1?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
-                        val encodedUri2 = videoUri2?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
-
-                        Log.d(TAG, "Navigating to StartPositionSettingScreen with durations: originalDuration1Ms = $originalDuration1Ms, originalDuration2Ms = $originalDuration2Ms, startPosition1Ms = $startPosition1Ms, startPosition2Ms = $startPosition2Ms")
-
-                        navController.navigate(
-                            "${AppDestinations.START_POSITION_SETTING_ROUTE}/$encodedUri1/$encodedUri2/$startPosition1Ms/$startPosition2Ms/$originalDuration1Ms/$originalDuration2Ms"
-                        )
-                    }) {
-                        Icon(Icons.Filled.Settings, "開始位置設定")
-                    }
-                    IconButton(onClick = { layoutMode = layoutMode.next() }) {
-                        Icon(layoutMode.icon, contentDescription = layoutMode.description)
-                    }
                     AccountActionsMenu(navController = navController) // ★ AccountActionsMenu を追加
                 },
                 colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を更新
@@ -641,8 +616,8 @@ fun VideoScreen(navController: NavController) {
             }
 
             // Controls section
-            if (sharedMaxDurationMs > 0) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                if (sharedMaxDurationMs > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         Text(formatTime(sharedCurrentPositionMs), style = MaterialTheme.typography.bodySmall)
                         Text(formatTime(sharedMaxDurationMs), style = MaterialTheme.typography.bodySmall)
@@ -653,21 +628,42 @@ fun VideoScreen(navController: NavController) {
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-            } else {
-                Spacer(modifier = Modifier.height(56.dp)) // Placeholder for controls height when no video
-            }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp, horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(onClick = togglePlayPause, enabled = sharedMaxDurationMs > 0) {
-                    Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "一時停止" else "再生")
-                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text(if (isPlaying) "一時停止" else "再生")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { layoutMode = layoutMode.next() }) {
+                        Icon(layoutMode.icon, contentDescription = layoutMode.description)
+                    }
+
+                    IconButton(onClick = {
+                        val encodedUri1 = videoUri1?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
+                        val encodedUri2 = videoUri2?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
+                        navController.navigate(
+                            "${AppDestinations.START_POSITION_SETTING_ROUTE}/$encodedUri1/$encodedUri2/$startPosition1Ms/$startPosition2Ms/$originalDuration1Ms/$originalDuration2Ms"
+                        )
+                    }) {
+                        Icon(Icons.Filled.Settings, "開始位置設定")
+                    }
+
+                    Button(onClick = togglePlayPause, enabled = sharedMaxDurationMs > 0) {
+                        Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "一時停止" else "再生")
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text(if (isPlaying) "一時停止" else "再生")
+                    }
+
+                    IconButton(onClick = { navController.navigate(AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE) }) {
+                        Icon(Icons.Filled.Assessment, "分析結果一覧")
+                    }
+
+                    Button(
+                        onClick = { /* TODO: Navigate to Analysis Creation Screen */ },
+                        enabled = exoPlayer1 != null || exoPlayer2 != null
+                    ) {
+                        Text("解析")
+                    }
                 }
             }
         }

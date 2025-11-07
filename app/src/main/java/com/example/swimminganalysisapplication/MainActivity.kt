@@ -205,13 +205,18 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(
-                            route = "${AppDestinations.ANALYSIS_DETAIL_SCREEN_ROUTE}/{videoId}",
-                            arguments = listOf(navArgument("videoId") { type = NavType.IntType })
+                            route = "${AppDestinations.ANALYSIS_DETAIL_SCREEN_ROUTE}/{videoId}/{videoUuid}",
+                            arguments = listOf(
+                                navArgument("videoId") { type = NavType.IntType },
+                                navArgument("videoUuid") { type = NavType.StringType }
+                            )
                         ) { backStackEntry ->
                             val videoId = backStackEntry.arguments?.getInt("videoId")
-                            if (videoId != null) {
+                            val videoUuid = backStackEntry.arguments?.getString("videoUuid")
+                            if (videoId != null && videoUuid != null) {
                                 AnalysisDetailScreen(
                                     videoId = videoId,
+                                    videoUuid = videoUuid,
                                     navController = navController,
                                     viewModel = viewModel(factory = analysisViewModelFactory)
                                 )

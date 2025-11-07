@@ -85,7 +85,7 @@ fun AnalysisListScreen(
                         VideoItem(
                             video = video,
                             onItemClick = {
-                                navController.navigate("${AppDestinations.ANALYSIS_DETAIL_SCREEN_ROUTE}/${video.videoId}")
+                                navController.navigate("${AppDestinations.ANALYSIS_DETAIL_SCREEN_ROUTE}/${video.videoId}/${video.videoUuid}")
                             }
                         )
                     }
