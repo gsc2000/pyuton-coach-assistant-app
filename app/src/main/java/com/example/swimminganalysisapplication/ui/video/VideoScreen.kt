@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
+import android.view.TextureView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,11 +45,13 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -58,7 +61,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
@@ -74,10 +76,9 @@ private const val TAG = "VideoScreen"
 private const val SEEK_COMMAND_THRESHOLD_MS = 200 // Threshold to avoid tiny seeks
 
 enum class VideoLayoutMode {
-    OVERLAY_VIDEO2_TRANSPARENT, // video2 is semi-transparent
     VERTICAL,
     HORIZONTAL,
-    OVERLAY_VIDEO1_TRANSPARENT, // video1 is semi-transparent
+    OVERLAY
 }
 
 // Saver for Uri type for rememberSaveable
@@ -102,9 +103,7 @@ private fun VideoPlayerBox(
     currentPositionInTrimmedView: Long,
     durationOfTrimmedView: Long,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    alpha: Float = 1.0f
-
+    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier.clickable(onClick = onClick),
@@ -115,15 +114,14 @@ private fun VideoPlayerBox(
                 .fillMaxWidth()
                 .aspectRatio(videoAspectRatio ?: 16f / 9f)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .alpha(alpha)
         ) {
             if (exoPlayer != null) {
                 AndroidView(
                     factory = { context ->
-                        PlayerView(context).apply {
-                            player = exoPlayer
-                            useController = false // Ensure controller is off
-                        }
+                        TextureView(context)
+                    },
+                    update = { textureView ->
+                        exoPlayer.setVideoTextureView(textureView)
                     },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -210,6 +208,7 @@ fun VideoScreen(navController: NavController) {
 
     var isPlaying by rememberSaveable { mutableStateOf(false) }
     var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
+    var overlayAlpha by rememberSaveable { mutableStateOf(0.5f) }
 
     var sharedCurrentPositionMs by rememberSaveable { mutableStateOf(0L) }
     var sharedMaxDurationMs by rememberSaveable { mutableStateOf(0L) }
@@ -591,24 +590,25 @@ fun VideoScreen(navController: NavController) {
                             )
                         }
                     }
-                    VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT, VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> {
-                        val (alpha1, alpha2) = if (layoutMode == VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT) Pair(0.5f, 1f) else Pair(1f, 0.5f)
+                    VideoLayoutMode.OVERLAY -> {
+                        val (alpha1, alpha2) = Pair(1f - overlayAlpha, overlayAlpha)
+                        val zIndex1 = if (overlayAlpha > 0.5f) 1f else 2f
+                        val zIndex2 = if (overlayAlpha > 0.5f) 2f else 1f
+
                         Box(modifier = Modifier.fillMaxSize()) {
                             VideoPlayerBox(
                                 exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
                                 onClick = { /* Overlay mode, click disabled */ },
-                                modifier = Modifier.fillMaxSize(),
-                                alpha = alpha1
+                                modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1)
                             )
                             VideoPlayerBox(
                                 exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
                                 onClick = { /* Overlay mode, click disabled */ },
-                                modifier = Modifier.fillMaxSize(),
-                                alpha = alpha2
+                                modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2)
                             )
                         }
                     }
@@ -627,6 +627,21 @@ fun VideoScreen(navController: NavController) {
                         onValueChange = { onSeek(it) },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+
+                if (layoutMode == VideoLayoutMode.OVERLAY) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Video1")
+                        Slider(
+                            value = overlayAlpha,
+                            onValueChange = { 
+                                overlayAlpha = it
+                                Log.d(TAG, "Slider onValueChange: new overlayAlpha = $it") 
+                            },
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        )
+                        Text("Video2")
+                    }
                 }
 
                 Row(
@@ -672,25 +687,22 @@ fun VideoScreen(navController: NavController) {
 
 val VideoLayoutMode.icon: ImageVector
     get() = when (this) {
-        VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> Icons.Filled.SwapVert
         VideoLayoutMode.VERTICAL -> Icons.Filled.SwapHoriz
         VideoLayoutMode.HORIZONTAL -> Icons.Filled.Layers
-        VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT -> Icons.Filled.Layers
+        VideoLayoutMode.OVERLAY -> Icons.Filled.SwapVert
     }
 
 val VideoLayoutMode.description: String
     get() = when (this) {
-        VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> "縦並びに変更"
         VideoLayoutMode.VERTICAL -> "横並びに変更"
-        VideoLayoutMode.HORIZONTAL -> "重ね表示 (Video1が半透明)"
-        VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT -> "重ね表示 (Video2が半透明)"
+        VideoLayoutMode.HORIZONTAL -> "重ね表示に切り替え"
+        VideoLayoutMode.OVERLAY -> "縦並びに変更"
     }
 
 fun VideoLayoutMode.next(): VideoLayoutMode {
     return when (this) {
-        VideoLayoutMode.HORIZONTAL -> VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT
-        VideoLayoutMode.OVERLAY_VIDEO1_TRANSPARENT -> VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT
-        VideoLayoutMode.OVERLAY_VIDEO2_TRANSPARENT -> VideoLayoutMode.VERTICAL
+        VideoLayoutMode.HORIZONTAL -> VideoLayoutMode.OVERLAY
+        VideoLayoutMode.OVERLAY -> VideoLayoutMode.VERTICAL
         VideoLayoutMode.VERTICAL -> VideoLayoutMode.HORIZONTAL
     }
 }
