@@ -151,6 +151,7 @@ private fun VideoPlayerBox(
                         update = { view ->
                             view.setDrawingEnabled(isDrawingMode)
                             view.setDrawMode(drawMode)
+                            view.setVideoAspectRatio(videoAspectRatio)
                         }
                     )
                     if (durationOfTrimmedView > 0L) {
@@ -622,32 +623,36 @@ fun VideoScreen(navController: NavController) {
                     }
                     VideoLayoutMode.VERTICAL -> {
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp).verticalScroll(rememberScrollState()),
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            VideoPlayerBox(
-                                exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
-                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
-                                durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
-                                onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
-                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
-                                drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
-                                onClearLines = { lineDrawingView1.clearCanvas() },
-                                lineDrawingView = lineDrawingView1,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                VideoPlayerBox(
+                                    exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
+                                    currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
+                                    durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
+                                    onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
+                                    isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
+                                    drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                    onClearLines = { lineDrawingView1.clearCanvas() },
+                                    lineDrawingView = lineDrawingView1,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                             if (exoPlayer1 != null || exoPlayer2 != null) Spacer(Modifier.height(8.dp))
-                            VideoPlayerBox(
-                                exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
-                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
-                                durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
-                                onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
-                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
-                                drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
-                                onClearLines = { lineDrawingView2.clearCanvas() },
-                                lineDrawingView = lineDrawingView2,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                VideoPlayerBox(
+                                    exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
+                                    currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
+                                    durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
+                                    onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
+                                    isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
+                                    drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                    onClearLines = { lineDrawingView2.clearCanvas() },
+                                    lineDrawingView = lineDrawingView2,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
                     VideoLayoutMode.OVERLAY -> {
