@@ -63,6 +63,12 @@ class LineDrawingView @JvmOverloads constructor(
     private var isMoving = false
     private var lastNormalized: PointF? = null
 
+    // Edit mode for selected shapes: null = move, "line_angle" = rotate line endpoint, "circle_resize" = adjust circle radius
+    private var editMode: String? = null
+    
+    // For line angle editing: which endpoint is being dragged ("start" or "end")
+    private var draggedLineEndpoint: String? = null
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         // Draw all committed shapes by converting normalized points to display coords
@@ -177,17 +183,37 @@ class LineDrawingView @JvmOverloads constructor(
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 val n = toNormalized(x, y)
-                // If touching near an existing shape, select and start moving instead of starting a new drawing
+                // If touching near an existing shape, select it
                 val hitIdx = findShapeAt(n, 0.05f)
                 if (hitIdx != null) {
                     selectedIndex = hitIdx
-                    isMoving = true
                     lastNormalized = n
+                    val shape = shapes[hitIdx]
+                    // Determine edit mode based on touch position within the shape
+                    editMode = when (shape) {
+                        is Shape.Line -> {
+                            if (isNearLineEndpoint(n, shape, 0.05f)) {
+                                // Determine which endpoint is closer
+                                draggedLineEndpoint = getCloserLineEndpoint(n, shape)
+                                "line_angle"
+                            } else {
+                                draggedLineEndpoint = null
+                                "move"
+                            }
+                        }
+                        is Shape.Circle -> {
+                            if (isNearCircleEdge(n, shape, 0.05f)) "circle_resize" else "move"
+                        }
+                        else -> "move"  // Free: always move
+                    }
+                    isMoving = true
                     return true
                 }
 
                 // Not hitting existing shape -> start creating a new one
                 selectedIndex = null
+                editMode = null
+                draggedLineEndpoint = null
                 val pts = toMutableListIfFree(currentDrawMode, n)
                 currentShape = pts
                 return true
@@ -197,9 +223,31 @@ class LineDrawingView @JvmOverloads constructor(
                 if (isMoving && selectedIndex != null) {
                     val idx = selectedIndex!!
                     val last = lastNormalized ?: n
-                    val dx = n.x - last.x
-                    val dy = n.y - last.y
-                    moveShapeBy(idx, dx, dy)
+                    val shape = shapes[idx]
+                    
+                    when (editMode) {
+                        "line_angle" -> {
+                            // Adjust the dragged endpoint of the line
+                            if (shape is Shape.Line) {
+                                when (draggedLineEndpoint) {
+                                    "start" -> shape.start.set(n.x, n.y)
+                                    "end" -> shape.end.set(n.x, n.y)
+                                }
+                            }
+                        }
+                        "circle_resize" -> {
+                            // Adjust circle radius by moving the radiusPoint
+                            if (shape is Shape.Circle) {
+                                shape.radiusPoint.set(n.x, n.y)
+                            }
+                        }
+                        else -> {
+                            // Move the entire shape
+                            val dx = n.x - last.x
+                            val dy = n.y - last.y
+                            moveShapeBy(idx, dx, dy)
+                        }
+                    }
                     lastNormalized = n
                 } else {
                     when (val cs = currentShape) {
@@ -214,6 +262,8 @@ class LineDrawingView @JvmOverloads constructor(
                 if (isMoving) {
                     isMoving = false
                     lastNormalized = null
+                    editMode = null
+                    draggedLineEndpoint = null
                 } else {
                     // Commit current shape (normalized points already stored)
                     currentShape?.let { shapes.add(it) }
@@ -366,6 +416,32 @@ class LineDrawingView @JvmOverloads constructor(
             }
         }
         invalidate()
+    }
+
+    // Check if normalized point n is near either endpoint of a line (within threshold)
+    private fun isNearLineEndpoint(n: PointF, line: Shape.Line, threshold: Float): Boolean {
+        val dStart = sqrt((n.x - line.start.x) * (n.x - line.start.x) + (n.y - line.start.y) * (n.y - line.start.y))
+        val dEnd = sqrt((n.x - line.end.x) * (n.x - line.end.x) + (n.y - line.end.y) * (n.y - line.end.y))
+        return dStart <= threshold || dEnd <= threshold
+    }
+
+    // Determine which endpoint ("start" or "end") of a line is closer to point n
+    private fun getCloserLineEndpoint(n: PointF, line: Shape.Line): String {
+        val dStart = sqrt((n.x - line.start.x) * (n.x - line.start.x) + (n.y - line.start.y) * (n.y - line.start.y))
+        val dEnd = sqrt((n.x - line.end.x) * (n.x - line.end.x) + (n.y - line.end.y) * (n.y - line.end.y))
+        return if (dStart <= dEnd) "start" else "end"
+    }
+
+    // Check if normalized point n is near the edge/circumference of a circle (within threshold)
+    private fun isNearCircleEdge(n: PointF, circle: Shape.Circle, threshold: Float): Boolean {
+        val dx = n.x - circle.center.x
+        val dy = n.y - circle.center.y
+        val distToCenter = sqrt(dx * dx + dy * dy)
+        val rdx = circle.radiusPoint.x - circle.center.x
+        val rdy = circle.radiusPoint.y - circle.center.y
+        val radius = sqrt(rdx * rdx + rdy * rdy)
+        // Check if close to circumference
+        return abs(distToCenter - radius) <= threshold
     }
 
     fun deleteSelectedShape() {
