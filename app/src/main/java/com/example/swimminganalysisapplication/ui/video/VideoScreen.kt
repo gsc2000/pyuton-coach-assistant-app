@@ -14,17 +14,23 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.BorderColor
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
@@ -33,6 +39,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -103,50 +110,81 @@ private fun VideoPlayerBox(
     currentPositionInTrimmedView: Long,
     durationOfTrimmedView: Long,
     onClick: () -> Unit,
+    isDrawingMode: Boolean,
+    onIsDrawingModeChange: (Boolean) -> Unit,
+    drawMode: DrawMode,
+    onDrawModeChange: (DrawMode) -> Unit,
+    onClearLines: () -> Unit,
+    lineDrawingView: LineDrawingView,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
+
+    Column(modifier = modifier) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(videoAspectRatio ?: 16f / 9f)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            if (exoPlayer != null) {
-                AndroidView(
-                    factory = { context ->
-                        TextureView(context)
-                    },
-                    update = { textureView ->
-                        exoPlayer.setVideoTextureView(textureView)
-                    },
-                    modifier = Modifier.fillMaxSize()
+                .clickable(onClick = onClick, enabled = !isDrawingMode)
+                .border(
+                    width = if (isDrawingMode) 2.dp else 0.dp,
+                    color = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 )
-                if (durationOfTrimmedView > 0L) {
-                    LinearProgressIndicator(
-                        progress = { currentPositionInTrimmedView.toFloat() / durationOfTrimmedView.toFloat() },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .padding(horizontal = 2.dp, vertical = 2.dp),
-                        color = MaterialTheme.colorScheme.tertiary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(videoAspectRatio ?: 16f / 9f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (exoPlayer != null) {
+                    AndroidView(
+                        factory = { context ->
+                            TextureView(context)
+                        },
+                        update = { textureView ->
+                            exoPlayer.setVideoTextureView(textureView)
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("$videoName: タップして読込", style = MaterialTheme.typography.bodyMedium)
+                    AndroidView(
+                        factory = { lineDrawingView },
+                        modifier = Modifier.fillMaxSize(),
+                        update = { view ->
+                            view.setDrawingEnabled(isDrawingMode)
+                            view.setDrawMode(drawMode)
+                        }
+                    )
+                    if (durationOfTrimmedView > 0L) {
+                        LinearProgressIndicator(
+                            progress = { currentPositionInTrimmedView.toFloat() / durationOfTrimmedView.toFloat() },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .padding(horizontal = 2.dp, vertical = 2.dp),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("$videoName: タップして読込", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
+        }
+        if (exoPlayer != null) {
+            DrawingControls(
+                isDrawingMode = isDrawingMode,
+                onIsDrawingModeChange = onIsDrawingModeChange,
+                currentMode = drawMode,
+                onDrawModeChange = onDrawModeChange,
+                onClear = { lineDrawingView.clearCanvas() } // Call clear on the specific instance
+            )
         }
     }
 }
@@ -198,13 +236,16 @@ fun VideoScreen(navController: NavController) {
     var videoAspectRatio1 by remember { mutableStateOf<Float?>(null) }
     var originalDuration1Ms by remember { mutableStateOf(0L) }
     var startPosition1Ms by rememberSaveable { mutableStateOf(0L) }
+    var isDrawingMode1 by rememberSaveable { mutableStateOf(false) }
+    var drawMode1 by remember { mutableStateOf(DrawMode.FREE) }
 
     var videoUri2 by rememberSaveable(stateSaver = UriSaver) { mutableStateOf<Uri?>(null) }
     var exoPlayer2 by remember { mutableStateOf<ExoPlayer?>(null) }
     var videoAspectRatio2 by remember { mutableStateOf<Float?>(null) }
     var originalDuration2Ms by remember { mutableStateOf(0L) }
     var startPosition2Ms by rememberSaveable { mutableStateOf(0L) }
-
+    var isDrawingMode2 by rememberSaveable { mutableStateOf(false) }
+    var drawMode2 by remember { mutableStateOf(DrawMode.FREE) }
 
     var isPlaying by rememberSaveable { mutableStateOf(false) }
     var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
@@ -216,6 +257,9 @@ fun VideoScreen(navController: NavController) {
 
     var showVideoSourceDialog by remember { mutableStateOf(false) }
     var videoPlayerTargetForDialog by remember { mutableStateOf(0) }
+    
+    val lineDrawingView1 = remember { LineDrawingView(context) }
+    val lineDrawingView2 = remember { LineDrawingView(context) }
 
     val currentBackStackEntry = navController.currentBackStackEntry
     DisposableEffect(currentBackStackEntry) {
@@ -555,7 +599,11 @@ fun VideoScreen(navController: NavController) {
                                 exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
-                                onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
+                                onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
+                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
+                                drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                onClearLines = { lineDrawingView1.clearCanvas() },
+                                lineDrawingView = lineDrawingView1,
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
                             )
                             if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier.width(4.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
@@ -563,7 +611,11 @@ fun VideoScreen(navController: NavController) {
                                 exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
-                                onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
+                                onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
+                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
+                                drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                onClearLines = { lineDrawingView2.clearCanvas() },
+                                lineDrawingView = lineDrawingView2,
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
                             )
                         }
@@ -577,7 +629,11 @@ fun VideoScreen(navController: NavController) {
                                 exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
-                                onClick = { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true },
+                                onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
+                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
+                                drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                onClearLines = { lineDrawingView1.clearCanvas() },
+                                lineDrawingView = lineDrawingView1,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             if (exoPlayer1 != null || exoPlayer2 != null) Spacer(Modifier.height(8.dp))
@@ -585,7 +641,11 @@ fun VideoScreen(navController: NavController) {
                                 exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
-                                onClick = { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true },
+                                onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
+                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
+                                drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                onClearLines = { lineDrawingView2.clearCanvas() },
+                                lineDrawingView = lineDrawingView2,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -601,14 +661,22 @@ fun VideoScreen(navController: NavController) {
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
                                 onClick = { /* Overlay mode, click disabled */ },
-                                modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1)
+                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
+                                drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                onClearLines = { lineDrawingView1.clearCanvas() },
+                                lineDrawingView = lineDrawingView1,
+                                modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                             VideoPlayerBox(
                                 exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
                                 onClick = { /* Overlay mode, click disabled */ },
-                                modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2)
+                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
+                                drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                onClearLines = { lineDrawingView2.clearCanvas() },
+                                lineDrawingView = lineDrawingView2,
+                                modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                         }
                     }
@@ -634,10 +702,7 @@ fun VideoScreen(navController: NavController) {
                         Text("Video1")
                         Slider(
                             value = overlayAlpha,
-                            onValueChange = { 
-                                overlayAlpha = it
-                                Log.d(TAG, "Slider onValueChange: new overlayAlpha = $it") 
-                            },
+                            onValueChange = { overlayAlpha = it },
                             modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                         )
                         Text("Video2")
@@ -680,6 +745,38 @@ fun VideoScreen(navController: NavController) {
                         Text("解析")
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun DrawingControls(
+    isDrawingMode: Boolean,
+    onIsDrawingModeChange: (Boolean) -> Unit,
+    currentMode: DrawMode,
+    onDrawModeChange: (DrawMode) -> Unit,
+    onClear: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
+    ) {
+        IconToggleButton(checked = isDrawingMode, onCheckedChange = onIsDrawingModeChange) {
+            Icon(Icons.Filled.BorderColor, contentDescription = "Toggle Drawing")
+        }
+        if (isDrawingMode) {
+            IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
+                Icon(Icons.Filled.BorderColor, contentDescription = "Freehand") // Replace with a more suitable icon if available
+            }
+            IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
+                Icon(Icons.Filled.ShowChart, contentDescription = "Line")
+            }
+            IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
+                Icon(Icons.Filled.Circle, contentDescription = "Circle")
+            }
+            IconButton(onClick = onClear) {
+                Icon(Icons.Filled.Clear, contentDescription = "Clear Lines")
             }
         }
     }
