@@ -23,9 +23,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.Circle
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -114,6 +116,7 @@ private fun VideoPlayerBox(
     onIsDrawingModeChange: (Boolean) -> Unit,
     drawMode: DrawMode,
     onDrawModeChange: (DrawMode) -> Unit,
+    layoutMode: VideoLayoutMode,
     onClearLines: () -> Unit,
     lineDrawingView: LineDrawingView,
     modifier: Modifier = Modifier
@@ -178,13 +181,17 @@ private fun VideoPlayerBox(
                 }
             }
         }
+        // Place controls outside the video box so they don't overlap the video content
         if (exoPlayer != null) {
+            Spacer(modifier = Modifier.height(6.dp))
             DrawingControls(
+                layoutMode = layoutMode,
                 isDrawingMode = isDrawingMode,
                 onIsDrawingModeChange = onIsDrawingModeChange,
                 currentMode = drawMode,
                 onDrawModeChange = onDrawModeChange,
-                onClear = { lineDrawingView.clearCanvas() } // Call clear on the specific instance
+                onClear = { lineDrawingView.clearCanvas() }, // Call clear on the specific instance
+                onDeleteSelected = { lineDrawingView.deleteSelectedShape() }
             )
         }
     }
@@ -259,8 +266,8 @@ fun VideoScreen(navController: NavController) {
     var showVideoSourceDialog by remember { mutableStateOf(false) }
     var videoPlayerTargetForDialog by remember { mutableStateOf(0) }
     
-    val lineDrawingView1 = remember { LineDrawingView(context) }
-    val lineDrawingView2 = remember { LineDrawingView(context) }
+    val lineDrawingView1 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.RED) } }
+    val lineDrawingView2 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.BLUE) } }
 
     val currentBackStackEntry = navController.currentBackStackEntry
     DisposableEffect(currentBackStackEntry) {
@@ -603,6 +610,7 @@ fun VideoScreen(navController: NavController) {
                                 onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
                                 isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
                                 drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
@@ -615,6 +623,7 @@ fun VideoScreen(navController: NavController) {
                                 onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
                                 isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
                                 drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
@@ -634,6 +643,7 @@ fun VideoScreen(navController: NavController) {
                                     onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
                                     isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
                                     drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                    layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView1.clearCanvas() },
                                     lineDrawingView = lineDrawingView1,
                                     modifier = Modifier.fillMaxSize()
@@ -648,6 +658,7 @@ fun VideoScreen(navController: NavController) {
                                     onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
                                     isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
                                     drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                    layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView2.clearCanvas() },
                                     lineDrawingView = lineDrawingView2,
                                     modifier = Modifier.fillMaxSize()
@@ -668,6 +679,7 @@ fun VideoScreen(navController: NavController) {
                                 onClick = { /* Overlay mode, click disabled */ },
                                 isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
                                 drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1, compositingStrategy = CompositingStrategy.Offscreen)
@@ -679,6 +691,7 @@ fun VideoScreen(navController: NavController) {
                                 onClick = { /* Overlay mode, click disabled */ },
                                 isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
                                 drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2, compositingStrategy = CompositingStrategy.Offscreen)
@@ -757,31 +770,75 @@ fun VideoScreen(navController: NavController) {
 
 @Composable
 fun DrawingControls(
+    layoutMode: VideoLayoutMode,
     isDrawingMode: Boolean,
     onIsDrawingModeChange: (Boolean) -> Unit,
     currentMode: DrawMode,
     onDrawModeChange: (DrawMode) -> Unit,
-    onClear: () -> Unit
+    onClear: () -> Unit,
+    onDeleteSelected: () -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
-    ) {
-        IconToggleButton(checked = isDrawingMode, onCheckedChange = onIsDrawingModeChange) {
-            Icon(Icons.Filled.BorderColor, contentDescription = "Toggle Drawing")
+    // Two-row layout for horizontal mode to avoid icon clipping; otherwise single row
+    if (layoutMode == VideoLayoutMode.HORIZONTAL) {
+        Column(
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
+                .padding(4.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconToggleButton(checked = isDrawingMode, onCheckedChange = onIsDrawingModeChange) {
+                    Icon(Icons.Filled.BorderColor, contentDescription = "Toggle Drawing")
+                }
+                if (isDrawingMode) {
+                    IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
+                        Icon(Icons.Filled.Brush, contentDescription = "Freehand")
+                    }
+                    IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
+                        Icon(Icons.Filled.ShowChart, contentDescription = "Line")
+                    }
+                }
+            }
+            if (isDrawingMode) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Swap positions: delete selected first, then clear all
+                    IconButton(onClick = onDeleteSelected) {
+                        Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected")
+                    }
+                    IconButton(onClick = onClear) {
+                        Icon(Icons.Filled.Close, contentDescription = "Clear All Lines")
+                    }
+                    IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
+                        Icon(Icons.Filled.Circle, contentDescription = "Circle")
+                    }
+                }
+            }
         }
-        if (isDrawingMode) {
-            IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
-                Icon(Icons.Filled.BorderColor, contentDescription = "Freehand") // Replace with a more suitable icon if available
+    } else {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
+        ) {
+            IconToggleButton(checked = isDrawingMode, onCheckedChange = onIsDrawingModeChange) {
+                Icon(Icons.Filled.BorderColor, contentDescription = "Toggle Drawing")
             }
-            IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
-                Icon(Icons.Filled.ShowChart, contentDescription = "Line")
-            }
-            IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
-                Icon(Icons.Filled.Circle, contentDescription = "Circle")
-            }
-            IconButton(onClick = onClear) {
-                Icon(Icons.Filled.Clear, contentDescription = "Clear Lines")
+            if (isDrawingMode) {
+                IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
+                    Icon(Icons.Filled.Brush, contentDescription = "Freehand")
+                }
+                IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
+                    Icon(Icons.Filled.ShowChart, contentDescription = "Line")
+                }
+                IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
+                    Icon(Icons.Filled.Circle, contentDescription = "Circle")
+                }
+                // Swap positions: delete selected first, then clear all
+                IconButton(onClick = onDeleteSelected) {
+                    Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected")
+                }
+                IconButton(onClick = onClear) {
+                    Icon(Icons.Filled.Close, contentDescription = "Clear All Lines")
+                }
             }
         }
     }
