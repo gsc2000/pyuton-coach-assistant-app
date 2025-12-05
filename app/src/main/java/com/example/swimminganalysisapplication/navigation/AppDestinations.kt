@@ -22,4 +22,6 @@ object AppDestinations {
     const val SINGLE_ANALYSIS_RESULT_ROUTE = "single_analysis_result_screen"
 
     const val ANALYSIS_DETAIL_SCREEN_ROUTE = "analysis_detail_screen"
+    const val PROJECT_LIST_SCREEN_ROUTE = "project_list_screen"
+    const val PROJECT_LOAD_ROUTE = "project_load_screen/{projectId}"
 }

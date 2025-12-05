@@ -50,6 +50,7 @@ import com.example.swimminganalysisapplication.ui.practicemenu.PracticeListViewM
 import com.example.swimminganalysisapplication.ui.theme.SwimmingAnalysisApplicationTheme
 import com.example.swimminganalysisapplication.ui.video.StartPositionSettingScreen
 import com.example.swimminganalysisapplication.ui.video.VideoScreen
+import com.example.swimminganalysisapplication.ui.video.ProjectListScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -256,6 +257,29 @@ class MainActivity : ComponentActivity() {
                                     viewModel = viewModel(factory = factory),
                                     navController = navController
                                 )
+                            }
+                        }
+                        composable(AppDestinations.PROJECT_LIST_SCREEN_ROUTE) {
+                            ProjectListScreen(
+                                navController = navController,
+                                onProjectSelected = { projectId ->
+                                    // Replace placeholder with actual projectId value
+                                    val route = AppDestinations.PROJECT_LOAD_ROUTE.replace("{projectId}", projectId.toString())
+                                    navController.navigate(route) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                        }
+                        composable(
+                            route = AppDestinations.PROJECT_LOAD_ROUTE,
+                            arguments = listOf(navArgument("projectId") { type = NavType.IntType })
+                        ) { backStackEntry ->
+                            val projectId = backStackEntry.arguments?.getInt("projectId")
+                            if (projectId != null) {
+                                VideoScreen(navController = navController, projectId = projectId)
+                            } else {
+                                VideoScreen(navController = navController)
                             }
                         }
                     }

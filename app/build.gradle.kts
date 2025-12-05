@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") // <- 追加
+    kotlin("plugin.serialization") version "2.0.0" // <- 更新
+    id("com.google.devtools.ksp") version "2.0.0-1.0.24" // <- 更新
 }
 
 android {
@@ -83,6 +85,14 @@ dependencies {
 
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Room Database
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+    
+    // Kotlinx Serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.1")
 
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.2.0")

@@ -47,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
@@ -71,6 +72,9 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation.NavController
+import com.example.swimminganalysisapplication.data.storage.AppDatabase
+import com.example.swimminganalysisapplication.data.storage.ProjectEntity
+import com.example.swimminganalysisapplication.data.storage.ProjectRepository
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 import kotlinx.coroutines.delay
@@ -235,7 +239,7 @@ private fun VideoSourceChooserDialog(onDismissRequest: () -> Unit, onTakeVideoCl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VideoScreen(navController: NavController) {
+fun VideoScreen(navController: NavController, projectId: Int? = null) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope() // Get a CoroutineScope
 
@@ -266,8 +270,34 @@ fun VideoScreen(navController: NavController) {
     var showVideoSourceDialog by remember { mutableStateOf(false) }
     var videoPlayerTargetForDialog by remember { mutableStateOf(0) }
     
+    // Save dialog state
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var projectNameForSave by remember { mutableStateOf("") }
+    
     val lineDrawingView1 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.RED) } }
     val lineDrawingView2 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.BLUE) } }
+
+    // Load project if projectId is provided
+    LaunchedEffect(projectId) {
+        if (projectId != null) {
+            val db = AppDatabase.getDatabase(context)
+            val repository = ProjectRepository(db.projectDao())
+            val project = repository.getProjectById(projectId)
+            if (project != null) {
+                videoUri1 = Uri.parse(project.videoUri1)
+                videoUri2 = Uri.parse(project.videoUri2)
+                startPosition1Ms = project.startPosition1Ms
+                startPosition2Ms = project.startPosition2Ms
+                
+                // Deserialize and restore drawings
+                val drawingsData = project.drawingsJson
+                val video1Drawings = DrawingSerializer.deserializeShapesFromJson(drawingsData, "video1")
+                val video2Drawings = DrawingSerializer.deserializeShapesFromJson(drawingsData, "video2")
+                lineDrawingView1.setShapes(video1Drawings)
+                lineDrawingView2.setShapes(video2Drawings)
+            }
+        }
+    }
 
     val currentBackStackEntry = navController.currentBackStackEntry
     DisposableEffect(currentBackStackEntry) {
@@ -752,19 +782,82 @@ fun VideoScreen(navController: NavController) {
                         Text(if (isPlaying) "一時停止" else "再生")
                     }
 
-                    IconButton(onClick = { navController.navigate(AppDestinations.ANALYSIS_LIST_SCREEN_ROUTE) }) {
-                        Icon(Icons.Filled.Assessment, "分析結果一覧")
+                    IconButton(onClick = { navController.navigate(AppDestinations.PROJECT_LIST_SCREEN_ROUTE) }) {
+                        Icon(Icons.Filled.Assessment, "保存済みプロジェクト")
                     }
 
                     Button(
-                        onClick = { /* TODO: Navigate to Analysis Creation Screen */ },
+                        onClick = { showSaveDialog = true },
                         enabled = exoPlayer1 != null || exoPlayer2 != null
                     ) {
-                        Text("解析")
+                        Text("保存")
                     }
                 }
             }
         }
+    }
+
+    // Save dialog
+    if (showSaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveDialog = false },
+            title = { Text("プロジェクトを保存") },
+            text = {
+                TextField(
+                    value = projectNameForSave,
+                    onValueChange = { projectNameForSave = it },
+                    label = { Text("プロジェクト名") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (projectNameForSave.isNotBlank()) {
+                            coroutineScope.launch {
+                                val db = AppDatabase.getDatabase(context)
+                                val repository = ProjectRepository(db.projectDao())
+                                
+                                // Serialize drawings from both views
+                                val drawingsJson1 = DrawingSerializer.serializeShapes(
+                                    lineDrawingView1.getShapes()
+                                )
+                                val drawingsJson2 = DrawingSerializer.serializeShapes(
+                                    lineDrawingView2.getShapes()
+                                )
+                                
+                                // Combine drawings JSON: embed arrays directly (no extra quoting)
+                                val combinedDrawings = "{\"video1\":$drawingsJson1,\"video2\":$drawingsJson2}"
+                                
+                                val project = ProjectEntity(
+                                    name = projectNameForSave,
+                                    videoUri1 = videoUri1?.toString(),
+                                    videoUri2 = videoUri2?.toString(),
+                                    startPosition1Ms = startPosition1Ms,
+                                    startPosition2Ms = startPosition2Ms,
+                                    drawingsJson = combinedDrawings
+                                )
+                                
+                                repository.insertProject(project)
+                                
+                                // Reset dialog
+                                showSaveDialog = false
+                                projectNameForSave = ""
+                            }
+                        }
+                    }
+                ) {
+                    Text("保存")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showSaveDialog = false }) {
+                    Text("キャンセル")
+                }
+            }
+        )
     }
 }
 

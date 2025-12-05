@@ -37,7 +37,7 @@ class LineDrawingView @JvmOverloads constructor(
     }
 
     // Store shapes in normalized coordinates (0..1 within the video content rect)
-    private sealed class Shape {
+    sealed class Shape {
         class Free(val points: MutableList<PointF>) : Shape()
         class Line(var start: PointF, var end: PointF) : Shape()
         class Circle(var center: PointF, var radiusPoint: PointF) : Shape()
@@ -294,6 +294,20 @@ class LineDrawingView @JvmOverloads constructor(
     fun setVideoAspectRatio(aspect: Float?) {
         videoAspectRatio = aspect ?: (16f / 9f)
         computeContentRect(width, height)
+        invalidate()
+    }
+
+    /** Get all committed shapes for serialization */
+    fun getShapes(): List<Shape> {
+        return shapes.toList()
+    }
+
+    /** Restore shapes from deserialized data */
+    fun setShapes(shapeList: List<Shape>) {
+        shapes.clear()
+        shapes.addAll(shapeList)
+        selectedIndex = null
+        currentShape = null
         invalidate()
     }
 
