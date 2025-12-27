@@ -32,7 +32,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
@@ -273,6 +273,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     // Save dialog state
     var showSaveDialog by remember { mutableStateOf(false) }
     var projectNameForSave by remember { mutableStateOf("") }
+    var loadedProject by remember { mutableStateOf<com.example.swimminganalysisapplication.data.storage.ProjectEntity?>(null) }
     
     val lineDrawingView1 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.RED) } }
     val lineDrawingView2 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.BLUE) } }
@@ -288,6 +289,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 videoUri2 = Uri.parse(project.videoUri2)
                 startPosition1Ms = project.startPosition1Ms
                 startPosition2Ms = project.startPosition2Ms
+                // remember loaded project for potential overwrite
+                loadedProject = project
+                // prefill save dialog name
+                projectNameForSave = project.name
                 
                 // Deserialize and restore drawings
                 val drawingsData = project.drawingsJson
@@ -799,23 +804,15 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
 
     // Save dialog
     if (showSaveDialog) {
-        AlertDialog(
-            onDismissRequest = { showSaveDialog = false },
-            title = { Text("プロジェクトを保存") },
-            text = {
-                TextField(
-                    value = projectNameForSave,
-                    onValueChange = { projectNameForSave = it },
-                    label = { Text("プロジェクト名") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (projectNameForSave.isNotBlank()) {
+        if (loadedProject != null) {
+            // Show choice dialog: overwrite or save as new
+            AlertDialog(
+                onDismissRequest = { showSaveDialog = false },
+                title = { Text("保存方法を選択") },
+                text = { Text("既存プロジェクトを上書きしますか、それとも新規保存しますか？") },
+                confirmButton = {
+                    Button(
+                        onClick = {
                             coroutineScope.launch {
                                 val db = AppDatabase.getDatabase(context)
                                 val repository = ProjectRepository(db.projectDao())
@@ -831,33 +828,105 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 // Combine drawings JSON: embed arrays directly (no extra quoting)
                                 val combinedDrawings = "{\"video1\":$drawingsJson1,\"video2\":$drawingsJson2}"
                                 
-                                val project = ProjectEntity(
-                                    name = projectNameForSave,
+                                // Overwrite existing project: preserve createdAt, update other fields
+                                val updated = ProjectEntity(
+                                    id = loadedProject!!.id,
+                                    name = loadedProject!!.name,
                                     videoUri1 = videoUri1?.toString(),
                                     videoUri2 = videoUri2?.toString(),
                                     startPosition1Ms = startPosition1Ms,
                                     startPosition2Ms = startPosition2Ms,
-                                    drawingsJson = combinedDrawings
+                                    drawingsJson = combinedDrawings,
+                                    createdAt = loadedProject!!.createdAt,
+                                    updatedAt = System.currentTimeMillis()
                                 )
+                                repository.updateProject(updated)
                                 
-                                repository.insertProject(project)
-                                
-                                // Reset dialog
+                                // Reset dialog and loaded project
                                 showSaveDialog = false
                                 projectNameForSave = ""
+                                loadedProject = null
                             }
                         }
+                    ) {
+                        Text("上書き保存")
                     }
-                ) {
-                    Text("保存")
+                },
+                dismissButton = {
+                    Button(
+                        onClick = {
+                            showSaveDialog = false
+                            // Show name input dialog for new save
+                            projectNameForSave = ""
+                            showSaveDialog = true
+                            loadedProject = null
+                        }
+                    ) {
+                        Text("名前をつけて保存")
+                    }
                 }
-            },
-            dismissButton = {
-                Button(onClick = { showSaveDialog = false }) {
-                    Text("キャンセル")
+            )
+        } else {
+            // Show name input dialog for new save
+            AlertDialog(
+                onDismissRequest = { showSaveDialog = false },
+                title = { Text("プロジェクトを保存") },
+                text = {
+                    TextField(
+                        value = projectNameForSave,
+                        onValueChange = { projectNameForSave = it },
+                        label = { Text("プロジェクト名") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (projectNameForSave.isNotBlank()) {
+                                coroutineScope.launch {
+                                    val db = AppDatabase.getDatabase(context)
+                                    val repository = ProjectRepository(db.projectDao())
+                                    
+                                    // Serialize drawings from both views
+                                    val drawingsJson1 = DrawingSerializer.serializeShapes(
+                                        lineDrawingView1.getShapes()
+                                    )
+                                    val drawingsJson2 = DrawingSerializer.serializeShapes(
+                                        lineDrawingView2.getShapes()
+                                    )
+                                    
+                                    // Combine drawings JSON: embed arrays directly (no extra quoting)
+                                    val combinedDrawings = "{\"video1\":$drawingsJson1,\"video2\":$drawingsJson2}"
+                                    
+                                    val project = ProjectEntity(
+                                        name = projectNameForSave,
+                                        videoUri1 = videoUri1?.toString(),
+                                        videoUri2 = videoUri2?.toString(),
+                                        startPosition1Ms = startPosition1Ms,
+                                        startPosition2Ms = startPosition2Ms,
+                                        drawingsJson = combinedDrawings
+                                    )
+                                    repository.insertProject(project)
+                                    
+                                    // Reset dialog
+                                    showSaveDialog = false
+                                    projectNameForSave = ""
+                                }
+                            }
+                        }
+                    ) {
+                        Text("保存")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { showSaveDialog = false }) {
+                        Text("キャンセル")
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
@@ -887,7 +956,7 @@ fun DrawingControls(
                         Icon(Icons.Filled.Brush, contentDescription = "Freehand")
                     }
                     IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
-                        Icon(Icons.Filled.ShowChart, contentDescription = "Line")
+                        Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line")
                     }
                 }
             }
@@ -920,7 +989,7 @@ fun DrawingControls(
                     Icon(Icons.Filled.Brush, contentDescription = "Freehand")
                 }
                 IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
-                    Icon(Icons.Filled.ShowChart, contentDescription = "Line")
+                    Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line")
                 }
                 IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
                     Icon(Icons.Filled.Circle, contentDescription = "Circle")

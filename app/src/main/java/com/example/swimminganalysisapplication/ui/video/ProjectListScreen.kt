@@ -1,14 +1,17 @@
 package com.example.swimminganalysisapplication.ui.video
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -24,11 +27,12 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.storage.AppDatabase
 import com.example.swimminganalysisapplication.data.storage.ProjectRepository
+import com.example.swimminganalysisapplication.navigation.AppDestinations
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProjectListScreen(navController: NavController, onProjectSelected: (projectId: Int) -> Unit) {
+fun ProjectListScreen(navController: NavController) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -57,6 +61,20 @@ fun ProjectListScreen(navController: NavController, onProjectSelected: (projectI
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    // Navigate to new VideoScreen without projectId
+                    navController.navigate(AppDestinations.VIDEO_SCREEN_ROUTE) {
+                        launchSingleTop = true
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Filled.Add, "新規プロジェクト")
+            }
         }
     ) { innerPadding ->
         if (projects.isEmpty()) {
@@ -90,16 +108,15 @@ fun ProjectListScreen(navController: NavController, onProjectSelected: (projectI
                         },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable {
+                                // Auto-load project when clicked
+                                val route = AppDestinations.PROJECT_LOAD_ROUTE.replace("{projectId}", project.id.toString())
+                                navController.navigate(route) {
+                                    launchSingleTop = true
+                                }
+                            }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     )
-                    Button(
-                        onClick = { onProjectSelected(project.id) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                    ) {
-                        Text("読み込む")
-                    }
                 }
             }
         }

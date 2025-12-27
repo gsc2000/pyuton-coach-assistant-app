@@ -3,18 +3,19 @@ package com.example.swimminganalysisapplication.ui.home
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp // ExitToApp アイコンをインポート
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Compare
-import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Pool
 import androidx.compose.material.icons.filled.PostAdd
-import androidx.compose.material.icons.filled.Settings // Settings アイコンをインポート
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.* // remember, mutableStateOf, getValue, setValue をインポート
+import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,7 +78,7 @@ fun HomeScreen(navController: NavController) {
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Icon(
-                    imageVector = Icons.Filled.DirectionsRun,
+                    imageVector = Icons.AutoMirrored.Filled.DirectionsRun,
                     contentDescription = "ランニングアイコン",
                     modifier = Modifier.size(40.dp),
                     tint = MaterialTheme.colorScheme.primary
@@ -98,69 +99,7 @@ fun HomeScreen(navController: NavController) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Divider(modifier = Modifier.padding(vertical = 16.dp))
-
-            HomeNavigationCard(
-                title = "単体解析",
-                icon = Icons.Filled.Analytics,
-                onClick = { navController.navigate(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE) }
-            )
-
-            HomeNavigationCard(
-                title = "比較解析",
-                icon = Icons.Filled.Compare,
-                onClick = { navController.navigate(AppDestinations.VIDEO_SCREEN_ROUTE) }
-            )
-
-            HomeNavigationCard(
-                title = "練習メニュー",
-                icon = Icons.Filled.PostAdd,
-                onClick = { navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) }
-            )
-
-            HomeNavigationCard(
-                title = "選手管理",
-                icon = Icons.Filled.AccountCircle,
-                onClick = { navController.navigate(AppDestinations.PLAYER_LIST_SCREEN_ROUTE) }
-            )
-
             Spacer(modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HomeNavigationCard(
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    ElevatedCard(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 24.dp, vertical = 20.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                modifier = Modifier.size(36.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
         }
     }
 }

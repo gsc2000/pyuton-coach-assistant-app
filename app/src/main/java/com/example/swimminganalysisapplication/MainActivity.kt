@@ -5,10 +5,25 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Compare
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.PostAdd
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -75,12 +90,92 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val navController = rememberNavController()
+                    AppNavigationHost()
+                }
+            }
+        }
+    }
 
-                    NavHost(
-                        navController = navController,
-                        startDestination = AppDestinations.LOGIN_SCREEN_ROUTE
-                    ) {
+    @Composable
+    private fun AppNavigationHost() {
+        val navController = rememberNavController()
+        val selectedNavItem = remember { mutableStateOf(0) }
+        
+        // Observe current route to update bottom nav selection
+        val currentRoute = navController.currentBackStackEntry?.destination?.route
+        
+        Scaffold(
+            bottomBar = {
+                // Only show bottom nav if not on login/create account screens
+                if (currentRoute?.startsWith(AppDestinations.LOGIN_SCREEN_ROUTE) != true &&
+                    currentRoute?.startsWith(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE) != true) {
+                    NavigationBar {
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Filled.Home, contentDescription = "HOME") },
+                            label = { Text("HOME") },
+                            selected = selectedNavItem.value == 0,
+                            onClick = {
+                                selectedNavItem.value = 0
+                                navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
+                                    popUpTo(AppDestinations.HOME_SCREEN_ROUTE) { inclusive = true }
+                                }
+                            }
+                        )
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Filled.Analytics, contentDescription = "単体解析") },
+                            label = { Text("単体解析") },
+                            selected = selectedNavItem.value == 1,
+                            onClick = {
+                                selectedNavItem.value = 1
+                                navController.navigate(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Filled.Compare, contentDescription = "比較解析") },
+                            label = { Text("比較解析") },
+                            selected = selectedNavItem.value == 2,
+                            onClick = {
+                                selectedNavItem.value = 2
+                                navController.navigate(AppDestinations.PROJECT_LIST_SCREEN_ROUTE) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Filled.PostAdd, contentDescription = "練習メニュー") },
+                            label = { Text("練習メニュー") },
+                            selected = selectedNavItem.value == 3,
+                            onClick = {
+                                selectedNavItem.value = 3
+                                navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Filled.AccountCircle, contentDescription = "選手管理") },
+                            label = { Text("選手管理") },
+                            selected = selectedNavItem.value == 4,
+                            onClick = {
+                                selectedNavItem.value = 4
+                                navController.navigate(AppDestinations.PLAYER_LIST_SCREEN_ROUTE) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                NavHost(
+                                navController = navController,
+                                startDestination = AppDestinations.LOGIN_SCREEN_ROUTE
+                            ) {
                         composable(
                             route = AppDestinations.MENU_COMMENTS_WITH_ARG_ROUTE,
                             arguments = listOf(navArgument("menuId") { type = NavType.StringType })
@@ -259,28 +354,20 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
-                        composable(AppDestinations.PROJECT_LIST_SCREEN_ROUTE) {
-                            ProjectListScreen(
-                                navController = navController,
-                                onProjectSelected = { projectId ->
-                                    // Replace placeholder with actual projectId value
-                                    val route = AppDestinations.PROJECT_LOAD_ROUTE.replace("{projectId}", projectId.toString())
-                                    navController.navigate(route) {
-                                        launchSingleTop = true
-                                    }
-                                }
-                            )
-                        }
-                        composable(
-                            route = AppDestinations.PROJECT_LOAD_ROUTE,
-                            arguments = listOf(navArgument("projectId") { type = NavType.IntType })
-                        ) { backStackEntry ->
-                            val projectId = backStackEntry.arguments?.getInt("projectId")
-                            if (projectId != null) {
-                                VideoScreen(navController = navController, projectId = projectId)
-                            } else {
-                                VideoScreen(navController = navController)
-                            }
+                    composable(AppDestinations.PROJECT_LIST_SCREEN_ROUTE) {
+                        ProjectListScreen(
+                            navController = navController
+                        )
+                    }
+                    composable(
+                        route = AppDestinations.PROJECT_LOAD_ROUTE,
+                        arguments = listOf(navArgument("projectId") { type = NavType.IntType })
+                    ) { backStackEntry ->
+                        val projectId = backStackEntry.arguments?.getInt("projectId")
+                        if (projectId != null) {
+                            VideoScreen(navController = navController, projectId = projectId)
+                        } else {
+                            VideoScreen(navController = navController)
                         }
                     }
                 }
