@@ -66,9 +66,12 @@ fun StartPositionSettingScreen(
         mutableStateOf(savedStateHandle?.get<Long>("alignmentPoint2Ms") ?: initialStart2Ms) 
     }
 
-    // 共通の開始位置オフセット（秒単位、少数第一位まで） - SavedStateHandle から復元
+    // 共通のオフセット値（ミリ秒） - SavedStateHandle から復元（offset1Ms に格納）
+    val offsetMsFromHandle = savedStateHandle?.get<Long>("offset1Ms") ?: 0L
+    
+    // 共通のオフセット設定（秒単位、少数第一位まで）
     var startOffsetSec by remember { 
-        mutableStateOf(savedStateHandle?.get<Double>("startOffsetSec") ?: 0.0)
+        mutableStateOf(offsetMsFromHandle.toDouble() / 1000.0)
     }
     
     // オフセットの最大値を計算（両ビデオの位置合わせポイントの小さい方）
@@ -121,10 +124,13 @@ fun StartPositionSettingScreen(
                         // 状態を SavedStateHandle に保存
                         savedStateHandle?.set("alignmentPoint1Ms", alignmentPoint1Ms)
                         savedStateHandle?.set("alignmentPoint2Ms", alignmentPoint2Ms)
-                        savedStateHandle?.set("startOffsetSec", startOffsetSec)
                         
-                        // オフセットをミリ秒に変換
+                        // オフセットをミリ秒に変換（共通）
                         val offsetMs = (startOffsetSec * 1000.0).toLong()
+                        
+                        // 共通オフセットを保存（offset1Ms に格納）
+                        savedStateHandle?.set("offset1Ms", offsetMs)
+                        
                         // 実際の開始位置 = 位置合わせポイント - オフセット
                         val actualStart1Ms = (alignmentPoint1Ms.toLong() - offsetMs).coerceAtLeast(0L)
                         val actualStart2Ms = (alignmentPoint2Ms.toLong() - offsetMs).coerceAtLeast(0L)

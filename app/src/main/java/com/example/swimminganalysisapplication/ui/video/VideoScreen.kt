@@ -326,6 +326,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     var videoAspectRatio1 by remember { mutableStateOf<Float?>(null) }
     var originalDuration1Ms by remember { mutableStateOf(0L) }
     var startPosition1Ms by rememberSaveable { mutableStateOf(0L) }
+    var alignmentPoint1Ms by rememberSaveable { mutableStateOf(0L) }
     var isDrawingMode1 by rememberSaveable { mutableStateOf(false) }
     var drawMode1 by remember { mutableStateOf(DrawMode.FREE) }
 
@@ -334,8 +335,12 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     var videoAspectRatio2 by remember { mutableStateOf<Float?>(null) }
     var originalDuration2Ms by remember { mutableStateOf(0L) }
     var startPosition2Ms by rememberSaveable { mutableStateOf(0L) }
+    var alignmentPoint2Ms by rememberSaveable { mutableStateOf(0L) }
     var isDrawingMode2 by rememberSaveable { mutableStateOf(false) }
     var drawMode2 by remember { mutableStateOf(DrawMode.FREE) }
+
+    // 共通のオフセット値（個別に管理する必要はない）
+    var offsetMs by rememberSaveable { mutableStateOf(0L) }
 
     var isPlaying by rememberSaveable { mutableStateOf(false) }
     var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
@@ -361,20 +366,35 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     var projectNameForSave by remember { mutableStateOf("") }
     var loadedProject by remember { mutableStateOf<com.example.swimminganalysisapplication.data.storage.ProjectEntity?>(null) }
     
+    // ON_RESUME trigger for reloading project data
+    var onResumeTrigger by remember { mutableStateOf(0) }
+    // Flag to prevent DB reload when new start positions are applied from start position setting screen
+    var hasNewStartPositions by remember { mutableStateOf(false) }
+    
     val lineDrawingView1 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.RED) } }
     val lineDrawingView2 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.BLUE) } }
 
     // Load project if projectId is provided
     LaunchedEffect(projectId) {
         if (projectId != null) {
+            Log.d(TAG, "LaunchedEffect(projectId): Starting project load, projectId=$projectId")
             val db = AppDatabase.getDatabase(context)
             val repository = ProjectRepository(db.projectDao())
             val project = repository.getProjectById(projectId)
             if (project != null) {
+                Log.d(TAG, "LaunchedEffect(projectId): Loaded project: name=${project.name}")
+                Log.d(TAG, "LaunchedEffect(projectId): align1=${project.alignmentPoint1Ms}ms, offset=${project.offsetMs}ms, align2=${project.alignmentPoint2Ms}ms")
+                Log.d(TAG, "LaunchedEffect(projectId): startPos1=${project.startPosition1Ms}ms, startPos2=${project.startPosition2Ms}ms (from DB)")
                 videoUri1 = Uri.parse(project.videoUri1)
                 videoUri2 = Uri.parse(project.videoUri2)
+                // Restore alignment points and common offset
+                alignmentPoint1Ms = project.alignmentPoint1Ms
+                alignmentPoint2Ms = project.alignmentPoint2Ms
+                offsetMs = project.offsetMs
+                // Use startPosition from DB directly (don't recalculate)
                 startPosition1Ms = project.startPosition1Ms
                 startPosition2Ms = project.startPosition2Ms
+                Log.d(TAG, "LaunchedEffect(projectId): Using startPos1=$startPosition1Ms, startPos2=$startPosition2Ms from DB")
                 // remember loaded project for potential overwrite
                 loadedProject = project
                 // prefill save dialog name
@@ -386,6 +406,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 val video2Drawings = DrawingSerializer.deserializeShapesFromJson(drawingsData, "video2")
                 lineDrawingView1.setShapes(video1Drawings)
                 lineDrawingView2.setShapes(video2Drawings)
+                Log.d(TAG, "LaunchedEffect(projectId): Project load complete")
+            } else {
+                Log.d(TAG, "LaunchedEffect(projectId): Project not found")
             }
         }
     }
@@ -395,27 +418,85 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 Log.d(TAG, "ON_RESUME: videoUri1 = $videoUri1, videoUri2 = $videoUri2, startPos1=$startPosition1Ms, startPos2=$startPosition2Ms")
+                
+                // Trigger LaunchedEffect to reload project data
+                onResumeTrigger++
+                
                 if (currentBackStackEntry?.savedStateHandle?.contains("newStart1Ms") == true &&
                     currentBackStackEntry.savedStateHandle.contains("newStart2Ms") == true) {
                     Log.d(TAG, "ON_RESUME: Found new start positions in savedStateHandle")
                     val newStart1 = currentBackStackEntry.savedStateHandle.get<Long>("newStart1Ms") ?: startPosition1Ms
                     val newStart2 = currentBackStackEntry.savedStateHandle.get<Long>("newStart2Ms") ?: startPosition2Ms
+                    
+                    // Restore alignment points and common offset if available
+                    val newAlign1 = currentBackStackEntry.savedStateHandle.get<Long>("alignmentPoint1Ms")
+                    val newAlign2 = currentBackStackEntry.savedStateHandle.get<Long>("alignmentPoint2Ms")
+                    val newOffset = currentBackStackEntry.savedStateHandle.get<Long>("offset1Ms") // offset1Ms contains common offset
+                    
+                    if (newAlign1 != null && newAlign2 != null && newOffset != null) {
+                        alignmentPoint1Ms = newAlign1
+                        alignmentPoint2Ms = newAlign2
+                        offsetMs = newOffset
+                        Log.d(TAG, "ON_RESUME: Restored alignment points and offset: align1=$alignmentPoint1Ms, offset=$offsetMs, align2=$alignmentPoint2Ms")
+                    }
 
                     startPosition1Ms = min(newStart1, (originalDuration1Ms - 1L).coerceAtLeast(0L))
                     startPosition2Ms = min(newStart2, (originalDuration2Ms - 1L).coerceAtLeast(0L))
                     Log.d(TAG, "ON_RESUME: Applied new startPos1=$startPosition1Ms, new startPos2=$startPosition2Ms")
 
-
                     currentBackStackEntry.savedStateHandle.remove<Long>("newStart1Ms")
                     currentBackStackEntry.savedStateHandle.remove<Long>("newStart2Ms")
+                    currentBackStackEntry.savedStateHandle.remove<Long>("alignmentPoint1Ms")
+                    currentBackStackEntry.savedStateHandle.remove<Long>("alignmentPoint2Ms")
+                    currentBackStackEntry.savedStateHandle.remove<Long>("offset1Ms")
+                    currentBackStackEntry.savedStateHandle.remove<Long>("offset2Ms")
 
                     sharedCurrentPositionMs = 0L
                     isPlaying = false
+                    // Mark that new start positions have been applied (don't reload from DB)
+                    hasNewStartPositions = true
+                }
+                
+                // Restore temporary drawings if they exist
+                val tempDrawings = currentBackStackEntry?.savedStateHandle?.get<String>("tempDrawings")
+                if (tempDrawings != null) {
+                    Log.d(TAG, "ON_RESUME: Restoring temporary drawings")
+                    val video1Drawings = DrawingSerializer.deserializeShapesFromJson(tempDrawings, "video1")
+                    val video2Drawings = DrawingSerializer.deserializeShapesFromJson(tempDrawings, "video2")
+                    lineDrawingView1.setShapes(video1Drawings)
+                    lineDrawingView2.setShapes(video2Drawings)
+                    
+                    currentBackStackEntry?.savedStateHandle?.remove<String>("tempDrawings")
                 }
             }
         }
         currentBackStackEntry?.lifecycle?.addObserver(observer)
         onDispose { currentBackStackEntry?.lifecycle?.removeObserver(observer) }
+    }
+    
+    // Reload project data from DB when resuming (for latest alignment points and offset)
+    // But only if no new start positions were set from the start position setting screen
+    LaunchedEffect(onResumeTrigger) {
+        if (projectId != null && loadedProject != null && onResumeTrigger > 0 && !hasNewStartPositions) {
+            val db = AppDatabase.getDatabase(context)
+            val repository = ProjectRepository(db.projectDao())
+            val latestProject = repository.getProjectById(projectId)
+            if (latestProject != null) {
+                Log.d(TAG, "LaunchedEffect: Reloading project from DB: align1=${latestProject.alignmentPoint1Ms}, offset=${latestProject.offsetMs}, align2=${latestProject.alignmentPoint2Ms}")
+                alignmentPoint1Ms = latestProject.alignmentPoint1Ms
+                alignmentPoint2Ms = latestProject.alignmentPoint2Ms
+                offsetMs = latestProject.offsetMs
+                // Use startPosition from DB directly (don't recalculate)
+                startPosition1Ms = latestProject.startPosition1Ms
+                startPosition2Ms = latestProject.startPosition2Ms
+                Log.d(TAG, "LaunchedEffect: Using startPos1=${latestProject.startPosition1Ms}, startPos2=${latestProject.startPosition2Ms} from DB")
+                loadedProject = latestProject
+            }
+        } else if (hasNewStartPositions) {
+            Log.d(TAG, "LaunchedEffect: Skipping DB reload because new start positions were applied from start position setting screen")
+            // Reset flag for next time
+            hasNewStartPositions = false
+        }
     }
 
     val updateSharedMaxDuration = {
@@ -432,12 +513,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         }
         if (sharedMaxDurationMs != newMax) {
             Log.d(TAG, "updateSharedMaxDuration: OldMax=$sharedMaxDurationMs, NewMax=$newMax. currentSharedPos=$sharedCurrentPositionMs")
+            Log.d(TAG, "updateSharedMaxDuration: exoPlayer1=$exoPlayer1, dur1=$originalDuration1Ms, start1=$startPosition1Ms, trim1=$trimmedDuration1")
+            Log.d(TAG, "updateSharedMaxDuration: exoPlayer2=$exoPlayer2, dur2=$originalDuration2Ms, start2=$startPosition2Ms, trim2=$trimmedDuration2")
             sharedMaxDurationMs = newMax
             sharedCurrentPositionMs = sharedCurrentPositionMs.coerceIn(0L, newMax) // Ensure current position is within new max
         }
     }
     LaunchedEffect(startPosition1Ms, startPosition2Ms, originalDuration1Ms, originalDuration2Ms, exoPlayer1, exoPlayer2) {
-        Log.d(TAG, "LaunchedEffect to updateSharedMaxDuration: dep changed.")
+        Log.d(TAG, "LaunchedEffect to updateSharedMaxDuration triggered: startPos1=$startPosition1Ms, startPos2=$startPosition2Ms, dur1=$originalDuration1Ms, dur2=$originalDuration2Ms, player1=$exoPlayer1, player2=$exoPlayer2")
         updateSharedMaxDuration()
     }
 
@@ -594,6 +677,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
 
     DisposableEffect(videoUri1, exoPlayer1) {
         if (videoUri1 != null && exoPlayer1 == null) {
+            Log.d(TAG, "DisposableEffect(videoUri1): Initializing player1 with startPosition=$startPosition1Ms")
             initializeOrUpdatePlayer(null, videoUri1, startPosition1Ms, { exoPlayer1 = it }, { videoAspectRatio1 = it }, { originalDuration1Ms = it })
         }
         onDispose {
@@ -606,6 +690,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     }
     DisposableEffect(videoUri2, exoPlayer2) {
         if (videoUri2 != null && exoPlayer2 == null) {
+            Log.d(TAG, "DisposableEffect(videoUri2): Initializing player2 with startPosition=$startPosition2Ms")
             initializeOrUpdatePlayer(null, videoUri2, startPosition2Ms, { exoPlayer2 = it }, { videoAspectRatio2 = it }, { originalDuration2Ms = it })
         }
         onDispose {
@@ -972,6 +1057,17 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                     }
 
                     IconButton(onClick = {
+                        // Save current drawings before navigating
+                        val drawingsJson1 = DrawingSerializer.serializeShapes(lineDrawingView1.getShapes())
+                        val drawingsJson2 = DrawingSerializer.serializeShapes(lineDrawingView2.getShapes())
+                        // Combine into single JSON with video keys
+                        val combinedDrawings = "{\"video1\":$drawingsJson1,\"video2\":$drawingsJson2}"
+                        currentBackStackEntry?.savedStateHandle?.set("tempDrawings", combinedDrawings)
+                        // Also save alignment points and common offset
+                        currentBackStackEntry?.savedStateHandle?.set("alignmentPoint1Ms", alignmentPoint1Ms)
+                        currentBackStackEntry?.savedStateHandle?.set("alignmentPoint2Ms", alignmentPoint2Ms)
+                        currentBackStackEntry?.savedStateHandle?.set("offset1Ms", offsetMs) // Common offset
+                        
                         val encodedUri1 = videoUri1?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
                         val encodedUri2 = videoUri2?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
                         navController.navigate(
@@ -1044,16 +1140,21 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     videoUri2 = videoUri2?.toString(),
                                     startPosition1Ms = startPosition1Ms,
                                     startPosition2Ms = startPosition2Ms,
+                                    alignmentPoint1Ms = alignmentPoint1Ms,
+                                    alignmentPoint2Ms = alignmentPoint2Ms,
+                                    offsetMs = offsetMs,
                                     drawingsJson = combinedDrawings,
                                     createdAt = loadedProject!!.createdAt,
                                     updatedAt = System.currentTimeMillis()
                                 )
+                                android.util.Log.d("VideoScreen", "Saving project: name=${updated.name}, align1=${updated.alignmentPoint1Ms}, offset=${updated.offsetMs}, align2=${updated.alignmentPoint2Ms}")
                                 repository.updateProject(updated)
+                                // Update loadedProject with the saved data
+                                loadedProject = updated
                                 
-                                // Reset dialog and loaded project
+                                // Reset dialog
                                 showSaveDialog = false
                                 projectNameForSave = ""
-                                loadedProject = null
                             }
                         }
                     ) {
@@ -1114,8 +1215,12 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                         videoUri2 = videoUri2?.toString(),
                                         startPosition1Ms = startPosition1Ms,
                                         startPosition2Ms = startPosition2Ms,
+                                        alignmentPoint1Ms = alignmentPoint1Ms,
+                                        alignmentPoint2Ms = alignmentPoint2Ms,
+                                        offsetMs = offsetMs,
                                         drawingsJson = combinedDrawings
                                     )
+                                    android.util.Log.d("VideoScreen", "Creating new project: name=${project.name}, align1=${project.alignmentPoint1Ms}, offset=${project.offsetMs}, align2=${project.alignmentPoint2Ms}")
                                     repository.insertProject(project)
                                     
                                     // Reset dialog
