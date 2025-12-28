@@ -3,6 +3,8 @@ package com.example.swimminganalysisapplication.ui.video
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -11,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -109,10 +112,11 @@ fun StartPositionSettingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Spacer(modifier = Modifier.height(8.dp))
             // Video 1 Settings
             if (video1UriString != null && duration1Ms > 0) {
                 Text("ビデオ1 開始位置", style = MaterialTheme.typography.titleMedium)
@@ -139,6 +143,7 @@ fun StartPositionSettingScreen(
             } else if (video2UriString != null) {
                 Text("ビデオ2: 長さ情報なし", style = MaterialTheme.typography.titleMedium)
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -150,11 +155,16 @@ private fun VideoPreviewAndSlider(
     durationMs: Long,
     onValueChange: (Long) -> Unit
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
         if (exoPlayer != null) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.8f)
+                    .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
@@ -171,7 +181,26 @@ private fun VideoPreviewAndSlider(
             value = if (durationMs > 0) selectedStartMs.toFloat() / durationMs.toFloat() else 0f,
             onValueChange = { newValue -> onValueChange((newValue * durationMs).toLong()) },
             valueRange = 0f..(if (durationMs > 0) 1f else 0f),
-            modifier = Modifier.fillMaxWidth(0.9f)
+            modifier = Modifier.fillMaxWidth()
         )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = { 
+                val newPos = (selectedStartMs - 33L).coerceAtLeast(0L)
+                onValueChange(newPos)
+            }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "前フレーム")
+            }
+            IconButton(onClick = { 
+                val newPos = (selectedStartMs + 33L).coerceAtMost(durationMs)
+                onValueChange(newPos)
+            }, modifier = Modifier.graphicsLayer(scaleX = -1f)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "次フレーム")
+            }
+        }
     }
 }
