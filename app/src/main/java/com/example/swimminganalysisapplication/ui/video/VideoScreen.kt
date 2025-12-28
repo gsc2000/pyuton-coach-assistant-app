@@ -671,6 +671,24 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         }
     }
 
+    val frameAdvance = { frameOffsetMs: Long ->
+        if (exoPlayer1 != null || exoPlayer2 != null) {
+            isPlaying = false
+            exoPlayer1?.pause()
+            exoPlayer2?.pause()
+            
+            val newPosition = (sharedCurrentPositionMs + frameOffsetMs).coerceIn(0, sharedMaxDurationMs)
+            sharedCurrentPositionMs = newPosition
+            
+            val targetPos1 = (startPosition1Ms + newPosition).coerceIn(0, originalDuration1Ms)
+            val targetPos2 = (startPosition2Ms + newPosition).coerceIn(0, originalDuration2Ms)
+            
+            exoPlayer1?.seekTo(targetPos1)
+            exoPlayer2?.seekTo(targetPos2)
+            Log.d(TAG, "Frame advance: moved to $newPosition ms")
+        }
+    }
+
     val onSeek = { newPositionFraction: Float ->
         if (sharedMaxDurationMs > 0) {
             isSeeking = true
@@ -929,10 +947,18 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                         Icon(Icons.Filled.Settings, "開始位置設定")
                     }
 
+                    IconButton(onClick = { frameAdvance(-33L) }, enabled = sharedMaxDurationMs > 0) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "前フレーム")
+                    }
+
                     Button(onClick = togglePlayPause, enabled = sharedMaxDurationMs > 0) {
                         Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "一時停止" else "再生")
                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                         Text(if (isPlaying) "一時停止" else "再生")
+                    }
+
+                    IconButton(onClick = { frameAdvance(33L) }, enabled = sharedMaxDurationMs > 0, modifier = Modifier.graphicsLayer(scaleX = -1f)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "次フレーム")
                     }
 
                     IconButton(onClick = { navController.navigate(AppDestinations.PROJECT_LIST_SCREEN_ROUTE) }) {
