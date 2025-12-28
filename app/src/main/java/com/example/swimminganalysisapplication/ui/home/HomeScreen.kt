@@ -28,14 +28,21 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
+import com.example.swimminganalysisapplication.ui.common.FeatureLockDialog
 import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
 import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
+import com.example.swimminganalysisapplication.data.storage.UserPreferences
+import androidx.compose.ui.platform.LocalContext
 
 private const val TAG_HOME = "HomeScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
+    val context = LocalContext.current
+    val userPreferences = remember { UserPreferences(context) }
+    val isGuestUser by userPreferences.isGuestUser.collectAsState(initial = false)
+    var showLockDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -102,4 +109,13 @@ fun HomeScreen(navController: NavController) {
             Spacer(modifier = Modifier.weight(1f))
         }
     }
+
+    // ロック機能ダイアログ
+    FeatureLockDialog(
+        isOpen = showLockDialog,
+        onDismiss = { showLockDialog = false },
+        onNavigateToSignUp = {
+            navController.navigate(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE)
+        }
+    )
 }

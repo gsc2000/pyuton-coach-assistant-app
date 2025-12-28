@@ -24,6 +24,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -101,6 +105,15 @@ class MainActivity : ComponentActivity() {
     private fun AppNavigationHost() {
         val navController = rememberNavController()
         val selectedNavItem = remember { mutableStateOf(0) }
+        val userPreferences = remember { UserPreferences(this@MainActivity) }
+        val isGuestUser by userPreferences.isGuestUser.collectAsState(initial = false)
+        var showLockDialog by remember { mutableStateOf(false) }
+        var lockedFeatureRoute by remember { mutableStateOf<String?>(null) }
+        
+        // デバッグ用ログ
+        LaunchedEffect(isGuestUser) {
+            Log.d("MainActivity", "ゲストユーザーフラグが更新: $isGuestUser")
+        }
         
         // Observe current route to update bottom nav selection
         val navBackStackEntry = navController.currentBackStackEntryAsState().value
@@ -128,12 +141,17 @@ class MainActivity : ComponentActivity() {
                         )
                         NavigationBarItem(
                             icon = { Icon(Icons.Filled.Analytics, contentDescription = "単体解析") },
-                            label = { Text("単体解析") },
+                            label = { Text(if (isGuestUser) "単体解析 🔐" else "単体解析") },
                             selected = selectedNavItem.value == 1,
                             onClick = {
-                                selectedNavItem.value = 1
-                                navController.navigate(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE) {
-                                    launchSingleTop = true
+                                if (isGuestUser) {
+                                    showLockDialog = true
+                                    lockedFeatureRoute = AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE
+                                } else {
+                                    selectedNavItem.value = 1
+                                    navController.navigate(AppDestinations.SINGLE_ANALYSIS_SETUP_ROUTE) {
+                                        launchSingleTop = true
+                                    }
                                 }
                             }
                         )
@@ -150,23 +168,33 @@ class MainActivity : ComponentActivity() {
                         )
                         NavigationBarItem(
                             icon = { Icon(Icons.Filled.PostAdd, contentDescription = "練習メニュー") },
-                            label = { Text("練習メニュー") },
+                            label = { Text(if (isGuestUser) "練習メニュー 🔐" else "練習メニュー") },
                             selected = selectedNavItem.value == 3,
                             onClick = {
-                                selectedNavItem.value = 3
-                                navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
-                                    launchSingleTop = true
+                                if (isGuestUser) {
+                                    showLockDialog = true
+                                    lockedFeatureRoute = AppDestinations.PRACTICE_LIST_SCREEN_ROUTE
+                                } else {
+                                    selectedNavItem.value = 3
+                                    navController.navigate(AppDestinations.PRACTICE_LIST_SCREEN_ROUTE) {
+                                        launchSingleTop = true
+                                    }
                                 }
                             }
                         )
                         NavigationBarItem(
                             icon = { Icon(Icons.Filled.AccountCircle, contentDescription = "選手管理") },
-                            label = { Text("選手管理") },
+                            label = { Text(if (isGuestUser) "選手管理 🔐" else "選手管理") },
                             selected = selectedNavItem.value == 4,
                             onClick = {
-                                selectedNavItem.value = 4
-                                navController.navigate(AppDestinations.PLAYER_LIST_SCREEN_ROUTE) {
-                                    launchSingleTop = true
+                                if (isGuestUser) {
+                                    showLockDialog = true
+                                    lockedFeatureRoute = AppDestinations.PLAYER_LIST_SCREEN_ROUTE
+                                } else {
+                                    selectedNavItem.value = 4
+                                    navController.navigate(AppDestinations.PLAYER_LIST_SCREEN_ROUTE) {
+                                        launchSingleTop = true
+                                    }
                                 }
                             }
                         )
@@ -377,6 +405,32 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+
+        // ゲストユーザーロック確認ダイアログ
+        if (showLockDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showLockDialog = false },
+                title = { Text("会員登録が必要です") },
+                text = { Text("この機能を使用するには会員登録が必要です。\nアカウント作成ページへ進みますか？") },
+                confirmButton = {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            navController.navigate(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE)
+                            showLockDialog = false
+                        }
+                    ) {
+                        Text("アカウント作成")
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = { showLockDialog = false }
+                    ) {
+                        Text("キャンセル")
+                    }
+                }
+            )
         }
     }
 }

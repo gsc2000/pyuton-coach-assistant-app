@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey // Int型用に変更
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -16,6 +17,7 @@ class UserPreferences(private val context: Context) {
         private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("user_prefs")
         private val AUTH_TOKEN_KEY = stringPreferencesKey("auth_token")
         private val USER_ID_KEY = intPreferencesKey("user_id") // USER_ID_KEY を追加 (Int型)
+        private val IS_GUEST_USER_KEY = booleanPreferencesKey("is_guest_user") // ゲストユーザーフラグ
     }
 
     val authToken: Flow<String?>
@@ -50,6 +52,18 @@ class UserPreferences(private val context: Context) {
     suspend fun clearUserId() {
         context.dataStore.edit { preferences ->
             preferences.remove(USER_ID_KEY)
+        }
+    }
+
+    // --- ゲストユーザーフラグ関連 ---
+    val isGuestUser: Flow<Boolean>
+        get() = context.dataStore.data.map { preferences ->
+            preferences[IS_GUEST_USER_KEY] ?: false
+        }
+
+    suspend fun setGuestUser(isGuest: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_GUEST_USER_KEY] = isGuest
         }
     }
 }

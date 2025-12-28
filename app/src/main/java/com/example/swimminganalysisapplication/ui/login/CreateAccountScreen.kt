@@ -1,10 +1,11 @@
 package com.example.swimminganalysisapplication.ui.login
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
-import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +53,16 @@ fun CreateAccountScreen(
         topBar = {
             TopAppBar(
                 title = { Text("アカウント作成") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = androidx.compose.ui.graphics.Color.White,
+                    navigationIconContentColor = androidx.compose.ui.graphics.Color.White
+                ),
                 modifier = Modifier.heightIn(max = CustomTopAppBarHeight)
             )
         }

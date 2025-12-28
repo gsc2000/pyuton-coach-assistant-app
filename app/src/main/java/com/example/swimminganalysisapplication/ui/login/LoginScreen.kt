@@ -11,6 +11,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.data.storage.UserPreferences
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,6 +23,8 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel) {
     val loginState by viewModel.loginState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val userPreferences = remember { UserPreferences(context) }
 
     LaunchedEffect(loginState) {
         when (val state = loginState) {
@@ -106,9 +110,12 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel) {
 
             TextButton(
                 onClick = {
-                    navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
-                        popUpTo(AppDestinations.LOGIN_SCREEN_ROUTE) { inclusive = true }
-                        launchSingleTop = true
+                    scope.launch {
+                        userPreferences.setGuestUser(true)
+                        navController.navigate(AppDestinations.HOME_SCREEN_ROUTE) {
+                            popUpTo(AppDestinations.LOGIN_SCREEN_ROUTE) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
                 }
             ) {
