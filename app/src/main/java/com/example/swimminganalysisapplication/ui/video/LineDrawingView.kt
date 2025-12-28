@@ -207,6 +207,8 @@ class LineDrawingView @JvmOverloads constructor(
                         else -> "move"  // Free: always move
                     }
                     isMoving = true
+                    // Prevent parent scroll when shape is selected
+                    parent?.requestDisallowInterceptTouchEvent(true)
                     return true
                 }
 
@@ -264,6 +266,8 @@ class LineDrawingView @JvmOverloads constructor(
                     lastNormalized = null
                     editMode = null
                     draggedLineEndpoint = null
+                    // Allow parent scroll again
+                    parent?.requestDisallowInterceptTouchEvent(false)
                 } else {
                     // Commit current shape (normalized points already stored)
                     currentShape?.let { shapes.add(it) }
@@ -309,6 +313,11 @@ class LineDrawingView @JvmOverloads constructor(
         selectedIndex = null
         currentShape = null
         invalidate()
+    }
+
+    /** Check if a shape is currently selected */
+    fun isShapeSelected(): Boolean {
+        return selectedIndex != null
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

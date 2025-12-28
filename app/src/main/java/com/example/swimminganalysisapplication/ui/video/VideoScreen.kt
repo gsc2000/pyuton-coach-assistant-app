@@ -123,6 +123,11 @@ private fun VideoPlayerBox(
     layoutMode: VideoLayoutMode,
     onClearLines: () -> Unit,
     lineDrawingView: LineDrawingView,
+    scale: Float = 1f,
+    offsetX: Float = 0f,
+    offsetY: Float = 0f,
+    onScaleChange: (Float) -> Unit = {},
+    onOffsetChange: (Float, Float) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
 
@@ -139,7 +144,13 @@ private fun VideoPlayerBox(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(videoAspectRatio ?: 16f / 9f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 if (exoPlayer != null) {
@@ -262,6 +273,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     var isPlaying by rememberSaveable { mutableStateOf(false) }
     var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
     var overlayAlpha by rememberSaveable { mutableStateOf(0.5f) }
+
+    // Pinch zoom state for each video player
+    var videoScale1 by remember { mutableStateOf(1f) }
+    var videoOffsetX1 by remember { mutableStateOf(0f) }
+    var videoOffsetY1 by remember { mutableStateOf(0f) }
+    var videoScale2 by remember { mutableStateOf(1f) }
+    var videoOffsetX2 by remember { mutableStateOf(0f) }
+    var videoOffsetY2 by remember { mutableStateOf(0f) }
 
     var sharedCurrentPositionMs by rememberSaveable { mutableStateOf(0L) }
     var sharedMaxDurationMs by rememberSaveable { mutableStateOf(0L) }
@@ -648,6 +667,11 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
+                                scale = videoScale1,
+                                offsetX = videoOffsetX1,
+                                offsetY = videoOffsetY1,
+                                onScaleChange = { videoScale1 = it },
+                                onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
                             )
                             if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier.width(4.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
@@ -661,16 +685,27 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
+                                scale = videoScale2,
+                                offsetX = videoOffsetX2,
+                                offsetY = videoOffsetY2,
+                                onScaleChange = { videoScale2 = it },
+                                onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
                             )
                         }
                     }
                     VideoLayoutMode.VERTICAL -> {
+                        val verticalScrollState = rememberScrollState()
+                        val isShapeSelected = lineDrawingView1.isShapeSelected() || lineDrawingView2.isShapeSelected()
+                        
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(verticalScrollState, enabled = !isShapeSelected)
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            Box(modifier = Modifier.fillMaxWidth().height(400.dp)) {
                                 VideoPlayerBox(
                                     exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
                                     currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
@@ -681,11 +716,16 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView1.clearCanvas() },
                                     lineDrawingView = lineDrawingView1,
+                                    scale = videoScale1,
+                                    offsetX = videoOffsetX1,
+                                    offsetY = videoOffsetY1,
+                                    onScaleChange = { videoScale1 = it },
+                                    onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
                             if (exoPlayer1 != null || exoPlayer2 != null) Spacer(Modifier.height(8.dp))
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            Box(modifier = Modifier.fillMaxWidth().height(400.dp)) {
                                 VideoPlayerBox(
                                     exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
                                     currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
@@ -696,6 +736,11 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView2.clearCanvas() },
                                     lineDrawingView = lineDrawingView2,
+                                    scale = videoScale2,
+                                    offsetX = videoOffsetX2,
+                                    offsetY = videoOffsetY2,
+                                    onScaleChange = { videoScale2 = it },
+                                    onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -717,6 +762,11 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
+                                scale = videoScale1,
+                                offsetX = videoOffsetX1,
+                                offsetY = videoOffsetY1,
+                                onScaleChange = { videoScale1 = it },
+                                onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                             VideoPlayerBox(
@@ -729,6 +779,11 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
+                                scale = videoScale2,
+                                offsetX = videoOffsetX2,
+                                offsetY = videoOffsetY2,
+                                onScaleChange = { videoScale2 = it },
+                                onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                         }
