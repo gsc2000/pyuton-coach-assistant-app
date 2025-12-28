@@ -16,10 +16,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
@@ -55,9 +58,12 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -130,6 +136,37 @@ private fun VideoPlayerBox(
     onOffsetChange: (Float, Float) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    // Keep track of previous scale/offset for gesture calculations
+    var previousScale by remember { mutableStateOf(scale) }
+    var previousOffsetX by remember { mutableStateOf(offsetX) }
+    var previousOffsetY by remember { mutableStateOf(offsetY) }
+    
+    // Update previous values when state changes
+    LaunchedEffect(scale, offsetX, offsetY) {
+        previousScale = scale
+        previousOffsetX = offsetX
+        previousOffsetY = offsetY
+    }
+    
+    // Reset zoom when entering drawing mode for stable drawing
+    LaunchedEffect(isDrawingMode) {
+        if (isDrawingMode && scale > 1f) {
+            onScaleChange(1f)
+            onOffsetChange(0f, 0f)
+            previousScale = 1f
+            previousOffsetX = 0f
+            previousOffsetY = 0f
+        }
+    }
+    
+    // Calculate constrained offset to prevent panning outside the visible area
+    // The offset is constrained so the scaled content doesn't go outside the visible bounds
+    fun constrainOffset(offset: Float, scale: Float, size: Float): Float {
+        if (scale <= 1f) return 0f
+        // Maximum offset is half the scaled size minus half the original size
+        val maxOffset = (size * (scale - 1f)) / 2f
+        return offset.coerceIn(-maxOffset, maxOffset)
+    }
 
     Column(modifier = modifier) {
         Box(
@@ -139,18 +176,47 @@ private fun VideoPlayerBox(
                     width = if (isDrawingMode) 2.dp else 0.dp,
                     color = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 )
+                .clip(RectangleShape)
+                .pointerInput(Unit) {
+                    detectTransformGestures { centroid, pan, gestureZoom, rotation ->
+                        // Disable zoom/pan in drawing mode
+                        if (isDrawingMode) return@detectTransformGestures
+                        
+                        // Use the actual current values, not captured ones
+                        val newScale = (previousScale * gestureZoom).coerceIn(1f, 5f)
+                        onScaleChange(newScale)
+                        previousScale = newScale
+                        
+                        // Handle pan - only pan when zoomed in
+                        if (previousScale > 1f) {
+                            val newOffsetX = previousOffsetX + pan.x
+                            val newOffsetY = previousOffsetY + pan.y
+                            // Constrain offsets to keep content within bounds using the pointer size
+                            val constrainedX = constrainOffset(newOffsetX, previousScale, this.size.width.toFloat())
+                            val constrainedY = constrainOffset(newOffsetY, previousScale, this.size.height.toFloat())
+                            onOffsetChange(constrainedX, constrainedY)
+                            previousOffsetX = constrainedX
+                            previousOffsetY = constrainedY
+                        } else {
+                            // Reset offset when scale is 1 or less
+                            onOffsetChange(0f, 0f)
+                            previousOffsetX = 0f
+                            previousOffsetY = 0f
+                        }
+                    }
+                }
+                .graphicsLayer(
+                    scaleX = scale.coerceAtLeast(1f),
+                    scaleY = scale.coerceAtLeast(1f),
+                    translationX = if (scale <= 1f) 0f else offsetX,
+                    translationY = if (scale <= 1f) 0f else offsetY
+                )
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(videoAspectRatio ?: 16f / 9f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY
-                    ),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (exoPlayer != null) {
@@ -170,6 +236,7 @@ private fun VideoPlayerBox(
                             view.setDrawingEnabled(isDrawingMode)
                             view.setDrawMode(drawMode)
                             view.setVideoAspectRatio(videoAspectRatio)
+                            view.setZoomInfo(scale, offsetX, offsetY)
                         }
                     )
                     if (durationOfTrimmedView > 0L) {
@@ -483,6 +550,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         Log.d(TAG, "Player initialized/updated for URI: $uri, seeking to $startPosMs ms. playWhenReady initially false.")
     }
 
+    // レイアウトモード変更時に編集モードを終了
+    LaunchedEffect(layoutMode) {
+        isDrawingMode1 = false
+        isDrawingMode2 = false
+        lineDrawingView1.clearSelection()
+        lineDrawingView2.clearSelection()
+    }
+
     DisposableEffect(videoUri1, exoPlayer1) {
         if (videoUri1 != null && exoPlayer1 == null) {
             initializeOrUpdatePlayer(null, videoUri1, startPosition1Ms, { exoPlayer1 = it }, { videoAspectRatio1 = it }, { originalDuration1Ms = it })
@@ -662,7 +737,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
                                 onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
-                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
+                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { newMode ->
+                                    isDrawingMode1 = newMode
+                                    if (!newMode) lineDrawingView1.clearSelection()
+                                },
                                 drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
@@ -680,7 +758,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
                                 onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
-                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
+                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { newMode ->
+                                    isDrawingMode2 = newMode
+                                    if (!newMode) lineDrawingView2.clearSelection()
+                                },
                                 drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
@@ -711,7 +792,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
                                     durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
                                     onClick = { if (!isDrawingMode1) { videoPlayerTargetForDialog = 1; showVideoSourceDialog = true } },
-                                    isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
+                                    isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { newMode ->
+                                        isDrawingMode1 = newMode
+                                        if (!newMode) lineDrawingView1.clearSelection()
+                                    },
                                     drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView1.clearCanvas() },
@@ -731,7 +815,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
                                     durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
                                     onClick = { if (!isDrawingMode2) { videoPlayerTargetForDialog = 2; showVideoSourceDialog = true } },
-                                    isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
+                                    isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { newMode ->
+                                        isDrawingMode2 = newMode
+                                        if (!newMode) lineDrawingView2.clearSelection()
+                                    },
                                     drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView2.clearCanvas() },
@@ -757,7 +844,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
                                 onClick = { /* Overlay mode, click disabled */ },
-                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { isDrawingMode1 = it },
+                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { newMode ->
+                                    isDrawingMode1 = newMode
+                                    if (!newMode) lineDrawingView1.clearSelection()
+                                },
                                 drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
@@ -774,7 +864,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
                                 durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
                                 onClick = { /* Overlay mode, click disabled */ },
-                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { isDrawingMode2 = it },
+                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { newMode ->
+                                    isDrawingMode2 = newMode
+                                    if (!newMode) lineDrawingView2.clearSelection()
+                                },
                                 drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
@@ -995,49 +1088,20 @@ fun DrawingControls(
     onClear: () -> Unit,
     onDeleteSelected: () -> Unit
 ) {
-    // Two-row layout for horizontal mode to avoid icon clipping; otherwise single row
+    // Use a scrollable Row for horizontal mode to prevent layout shift
     if (layoutMode == VideoLayoutMode.HORIZONTAL) {
-        Column(
+        Row(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
                 .padding(4.dp)
+                .horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconToggleButton(checked = isDrawingMode, onCheckedChange = onIsDrawingModeChange) {
-                    Icon(Icons.Filled.BorderColor, contentDescription = "Toggle Drawing")
-                }
-                if (isDrawingMode) {
-                    IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
-                        Icon(Icons.Filled.Brush, contentDescription = "Freehand")
-                    }
-                    IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
-                        Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line")
-                    }
-                }
-            }
-            if (isDrawingMode) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Swap positions: delete selected first, then clear all
-                    IconButton(onClick = onDeleteSelected) {
-                        Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected")
-                    }
-                    IconButton(onClick = onClear) {
-                        Icon(Icons.Filled.Close, contentDescription = "Clear All Lines")
-                    }
-                    IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
-                        Icon(Icons.Filled.Circle, contentDescription = "Circle")
-                    }
-                }
-            }
-        }
-    } else {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
-        ) {
-            IconToggleButton(checked = isDrawingMode, onCheckedChange = onIsDrawingModeChange) {
-                Icon(Icons.Filled.BorderColor, contentDescription = "Toggle Drawing")
+            IconButton(onClick = { onIsDrawingModeChange(!isDrawingMode) }) {
+                Icon(
+                    if (isDrawingMode) Icons.Filled.Close else Icons.Filled.BorderColor,
+                    contentDescription = "Toggle Drawing"
+                )
             }
             if (isDrawingMode) {
                 IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
@@ -1049,12 +1113,34 @@ fun DrawingControls(
                 IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
                     Icon(Icons.Filled.Circle, contentDescription = "Circle")
                 }
-                // Swap positions: delete selected first, then clear all
                 IconButton(onClick = onDeleteSelected) {
                     Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected")
                 }
-                IconButton(onClick = onClear) {
-                    Icon(Icons.Filled.Close, contentDescription = "Clear All Lines")
+            }
+        }
+    } else {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
+        ) {
+            IconButton(onClick = { onIsDrawingModeChange(!isDrawingMode) }) {
+                Icon(
+                    if (isDrawingMode) Icons.Filled.Close else Icons.Filled.BorderColor,
+                    contentDescription = "Toggle Drawing"
+                )
+            }
+            if (isDrawingMode) {
+                IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
+                    Icon(Icons.Filled.Brush, contentDescription = "Freehand")
+                }
+                IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
+                    Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line")
+                }
+                IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
+                    Icon(Icons.Filled.Circle, contentDescription = "Circle")
+                }
+                IconButton(onClick = onDeleteSelected) {
+                    Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected")
                 }
             }
         }

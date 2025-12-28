@@ -52,6 +52,11 @@ class LineDrawingView @JvmOverloads constructor(
     // Video aspect ratio used to compute the video content rect inside this view
     private var videoAspectRatio: Float = 16f / 9f
 
+    // Zoom information from parent
+    private var zoomScale: Float = 1f
+    private var zoomOffsetX: Float = 0f
+    private var zoomOffsetY: Float = 0f
+
     // Computed content rect (displayed video) in view coordinates
     private var contentLeft = 0f
     private var contentTop = 0f
@@ -288,6 +293,13 @@ class LineDrawingView @JvmOverloads constructor(
     fun clearCanvas() {
         shapes.clear()
         currentShape = null
+        selectedIndex = null
+        invalidate()
+    }
+    
+    fun clearSelection() {
+        selectedIndex = null
+        currentShape = null
         invalidate()
     }
 
@@ -298,6 +310,13 @@ class LineDrawingView @JvmOverloads constructor(
     fun setVideoAspectRatio(aspect: Float?) {
         videoAspectRatio = aspect ?: (16f / 9f)
         computeContentRect(width, height)
+        invalidate()
+    }
+    
+    fun setZoomInfo(scale: Float, offsetX: Float, offsetY: Float) {
+        zoomScale = scale
+        zoomOffsetX = offsetX
+        zoomOffsetY = offsetY
         invalidate()
     }
 
