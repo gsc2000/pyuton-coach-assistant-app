@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Comment
+import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
+import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -44,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Menu
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,11 +81,11 @@ fun DiscoverScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
+                actions = {
+                    AccountActionsMenu(navController = navController)
+                },
+                colors = getCustomTopAppBarColors(),
+                modifier = Modifier.heightIn(max = CustomTopAppBarHeight)
             )
         }
     ) { paddingValues ->

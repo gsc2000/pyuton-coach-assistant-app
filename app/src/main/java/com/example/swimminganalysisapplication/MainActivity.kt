@@ -31,6 +31,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.example.swimminganalysisapplication.data.SwimmingRepository
 import com.example.swimminganalysisapplication.data.remote.RetrofitClient
@@ -102,13 +103,17 @@ class MainActivity : ComponentActivity() {
         val selectedNavItem = remember { mutableStateOf(0) }
         
         // Observe current route to update bottom nav selection
-        val currentRoute = navController.currentBackStackEntry?.destination?.route
+        val navBackStackEntry = navController.currentBackStackEntryAsState().value
+        val currentRoute = navBackStackEntry?.destination?.route
         
         Scaffold(
             bottomBar = {
                 // Only show bottom nav if not on login/create account screens
-                if (currentRoute?.startsWith(AppDestinations.LOGIN_SCREEN_ROUTE) != true &&
-                    currentRoute?.startsWith(AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE) != true) {
+                val shouldShowBottomNav = currentRoute != null &&
+                    currentRoute != AppDestinations.LOGIN_SCREEN_ROUTE &&
+                    currentRoute != AppDestinations.CREATE_ACCOUNT_SCREEN_ROUTE
+                
+                if (shouldShowBottomNav) {
                     NavigationBar {
                         NavigationBarItem(
                             icon = { Icon(Icons.Filled.Home, contentDescription = "HOME") },

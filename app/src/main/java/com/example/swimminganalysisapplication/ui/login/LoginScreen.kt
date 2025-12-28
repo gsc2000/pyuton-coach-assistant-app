@@ -3,6 +3,8 @@ package com.example.swimminganalysisapplication.ui.login
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
+import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -42,7 +44,11 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("ログイン") })
+            TopAppBar(
+                title = { Text("ログイン") },
+                colors = getCustomTopAppBarColors(),
+                modifier = Modifier.heightIn(max = CustomTopAppBarHeight)
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->

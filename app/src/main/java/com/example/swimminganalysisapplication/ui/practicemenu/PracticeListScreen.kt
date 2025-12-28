@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
+import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -23,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.remote.model.Menu
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,12 +45,8 @@ fun PracticeListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("練習メニュー一覧") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
-                    actionIconContentColor = Color.White
-                ),
+                colors = getCustomTopAppBarColors(),
+                modifier = Modifier.heightIn(max = CustomTopAppBarHeight),
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
@@ -57,6 +56,7 @@ fun PracticeListScreen(
                     IconButton(onClick = { navController.navigate(AppDestinations.DISCOVER_SCREEN_ROUTE) }) {
                         Icon(Icons.Default.Search, contentDescription = "メニューを探す")
                     }
+                    AccountActionsMenu(navController = navController)
                 }
             )
         },

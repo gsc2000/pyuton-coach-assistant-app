@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -27,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
+import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
+import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
 
 private const val TAG_HOME = "HomeScreen"
 
@@ -38,14 +41,11 @@ fun HomeScreen(navController: NavController) {
         topBar = {
             TopAppBar(
                 title = { Text("Pyuton Coach Assistant") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
+                colors = getCustomTopAppBarColors(),
                 actions = {
                     AccountActionsMenu(navController = navController)
-                }
+                },
+                modifier = Modifier.heightIn(max = CustomTopAppBarHeight)
             )
         }
     ) { innerPadding ->

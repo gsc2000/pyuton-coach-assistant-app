@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
+import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -22,12 +24,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.data.storage.AppDatabase
 import com.example.swimminganalysisapplication.data.storage.ProjectRepository
 import com.example.swimminganalysisapplication.navigation.AppDestinations
+import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,10 +60,11 @@ fun ProjectListScreen(navController: NavController) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                actions = {
+                    AccountActionsMenu(navController = navController)
+                },
+                colors = getCustomTopAppBarColors(),
+                modifier = Modifier.heightIn(max = CustomTopAppBarHeight)
             )
         },
         floatingActionButton = {
@@ -71,7 +76,7 @@ fun ProjectListScreen(navController: NavController) {
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = Color.White
             ) {
                 Icon(Icons.Filled.Add, "新規プロジェクト")
             }

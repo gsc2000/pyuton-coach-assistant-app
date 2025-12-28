@@ -9,3 +9,7 @@ val LightOrange80 = Color(0xFFFFE0B2)
 val Orange40 = Color(0xFFF57C00)
 val OrangeGrey40 = Color(0xFF795548)
 val DarkOrange40 = Color(0xFFBF360C)
+
+// TopAppBar用の共通色設定
+val TopAppBarBackground = Orange40
+val TopAppBarTextColor = Color.White

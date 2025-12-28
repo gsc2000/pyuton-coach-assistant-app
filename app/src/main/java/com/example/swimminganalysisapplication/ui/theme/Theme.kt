@@ -10,6 +10,22 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+
+// カスタムTopAppBar高さ定数（全画面で一度に調整可能）
+val CustomTopAppBarHeight = 58.dp
+
+// TopAppBar用の共通色設定を返す関数（全画面で一度に調整可能）
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun getCustomTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
+    containerColor = TopAppBarBackground,
+    titleContentColor = TopAppBarTextColor,
+    navigationIconContentColor = TopAppBarTextColor,
+    actionIconContentColor = TopAppBarTextColor
+)
 
 private val DarkColorScheme = darkColorScheme(
     primary = Orange80,

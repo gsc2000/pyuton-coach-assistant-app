@@ -60,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -84,6 +85,8 @@ import com.example.swimminganalysisapplication.data.storage.ProjectEntity
 import com.example.swimminganalysisapplication.data.storage.ProjectRepository
 import com.example.swimminganalysisapplication.navigation.AppDestinations
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu
+import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
+import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
@@ -868,14 +871,16 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         topBar = {
             TopAppBar(
                 title = { Text("動画比較 & 解析") },
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
-                actions = {
-                    AccountActionsMenu(navController = navController) // ★ AccountActionsMenu を追加
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors( // ★ 色設定を更新
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer // ★ onPrimaryContainer を追加
-                )
+                actions = {
+                    AccountActionsMenu(navController = navController)
+                },
+                colors = getCustomTopAppBarColors(),
+                modifier = Modifier.heightIn(max = CustomTopAppBarHeight)
             )
         }
     ) { paddingValues ->
