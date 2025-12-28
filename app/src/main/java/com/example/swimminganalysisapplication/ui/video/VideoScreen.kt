@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -371,6 +372,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     // Flag to prevent DB reload when new start positions are applied from start position setting screen
     var hasNewStartPositions by remember { mutableStateOf(false) }
     
+    // Loading state - true until both players are ready and all data is loaded
+    var isLoading by remember { mutableStateOf(projectId != null) }  // Start loading if projectId is provided
+    
     val lineDrawingView1 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.RED) } }
     val lineDrawingView2 = remember { LineDrawingView(context).apply { setStrokeColor(android.graphics.Color.BLUE) } }
 
@@ -522,6 +526,24 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     LaunchedEffect(startPosition1Ms, startPosition2Ms, originalDuration1Ms, originalDuration2Ms, exoPlayer1, exoPlayer2) {
         Log.d(TAG, "LaunchedEffect to updateSharedMaxDuration triggered: startPos1=$startPosition1Ms, startPos2=$startPosition2Ms, dur1=$originalDuration1Ms, dur2=$originalDuration2Ms, player1=$exoPlayer1, player2=$exoPlayer2")
         updateSharedMaxDuration()
+        
+        // Check if loading is complete
+        // Loading is complete when:
+        // 1. projectId was provided (or no project needed)
+        // 2. Both players are initialized AND durations are known OR only one video is available with duration
+        val isProjectLoaded = projectId == null || loadedProject != null
+        val areBothPlayersReady = (videoUri1 != null && exoPlayer1 != null && originalDuration1Ms > 0) ||
+                                  (videoUri1 == null)
+        val areBothPlayersReady2 = (videoUri2 != null && exoPlayer2 != null && originalDuration2Ms > 0) ||
+                                   (videoUri2 == null)
+        val isPlaybackReady = (videoUri1 != null || videoUri2 != null) && // At least one video
+                              areBothPlayersReady && areBothPlayersReady2 && // Both available videos are ready
+                              sharedMaxDurationMs > 0 // Duration is calculated
+        
+        if (isProjectLoaded && isPlaybackReady && isLoading) {
+            Log.d(TAG, "LaunchedEffect: Loading complete. Hiding loading screen.")
+            isLoading = false
+        }
     }
 
     val takeVideoLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -857,11 +879,31 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+        if (isLoading && projectId != null) {
+            // Show loading screen while project is being loaded
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("プロジェクトを読み込み中...", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        } else {
+            // Show actual content when loaded
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
             Box(modifier = Modifier.weight(1f)) {
                 when (layoutMode) {
                     VideoLayoutMode.HORIZONTAL -> {
@@ -1103,6 +1145,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                     }
                 }
             }
+            }  // End of else block for loading state
         }
     }
 
