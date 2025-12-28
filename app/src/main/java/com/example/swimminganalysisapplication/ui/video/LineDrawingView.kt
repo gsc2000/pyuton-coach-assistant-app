@@ -179,15 +179,18 @@ class LineDrawingView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!isDrawingEnabled) {
-            return false
+            android.util.Log.d("LineDrawingView", "Drawing disabled, rejecting touch")
+            return super.onTouchEvent(event)
         }
 
         val x = event.x
         val y = event.y
+        android.util.Log.d("LineDrawingView", "Touch event: action=${event.action}, x=$x, y=$y, isMoving=$isMoving, selectedIndex=$selectedIndex")
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 val n = toNormalized(x, y)
+                android.util.Log.d("LineDrawingView", "ACTION_DOWN normalized: x=${n.x}, y=${n.y}, contentWidth=$contentWidthF, contentHeight=$contentHeightF")
                 // If touching near an existing shape, select it
                 val hitIdx = findShapeAt(n, 0.05f)
                 if (hitIdx != null) {
@@ -223,6 +226,9 @@ class LineDrawingView @JvmOverloads constructor(
                 draggedLineEndpoint = null
                 val pts = toMutableListIfFree(currentDrawMode, n)
                 currentShape = pts
+                android.util.Log.d("LineDrawingView", "Created new shape: mode=$currentDrawMode, startPoint=(${n.x}, ${n.y})")
+                // Prevent parent scroll when drawing a new shape
+                parent?.requestDisallowInterceptTouchEvent(true)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -257,10 +263,21 @@ class LineDrawingView @JvmOverloads constructor(
                     }
                     lastNormalized = n
                 } else {
+                    // Drawing a new shape
+                    parent?.requestDisallowInterceptTouchEvent(true)
                     when (val cs = currentShape) {
-                        is Shape.Free -> cs.points.add(n)
-                        is Shape.Line -> cs.end.set(n.x, n.y)
-                        is Shape.Circle -> cs.radiusPoint.set(n.x, n.y)
+                        is Shape.Free -> {
+                            cs.points.add(n)
+                            android.util.Log.d("LineDrawingView", "Added point to Free shape: (${n.x}, ${n.y}), total points=${cs.points.size}")
+                        }
+                        is Shape.Line -> {
+                            cs.end.set(n.x, n.y)
+                            android.util.Log.d("LineDrawingView", "Updated Line endpoint: (${n.x}, ${n.y})")
+                        }
+                        is Shape.Circle -> {
+                            cs.radiusPoint.set(n.x, n.y)
+                            android.util.Log.d("LineDrawingView", "Updated Circle radiusPoint: (${n.x}, ${n.y})")
+                        }
                         else -> {}
                     }
                 }
@@ -273,9 +290,30 @@ class LineDrawingView @JvmOverloads constructor(
                     draggedLineEndpoint = null
                     // Allow parent scroll again
                     parent?.requestDisallowInterceptTouchEvent(false)
+                    android.util.Log.d("LineDrawingView", "Shape editing finished")
                 } else {
                     // Commit current shape (normalized points already stored)
-                    currentShape?.let { shapes.add(it) }
+                    currentShape?.let { 
+                        shapes.add(it)
+                        android.util.Log.d("LineDrawingView", "Committed new shape, total shapes=${shapes.size}")
+                    }
+                    currentShape = null
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                android.util.Log.d("LineDrawingView", "ACTION_CANCEL received")
+                if (isMoving) {
+                    isMoving = false
+                    lastNormalized = null
+                    editMode = null
+                    draggedLineEndpoint = null
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                } else {
+                    // Also commit shape on cancel
+                    currentShape?.let { 
+                        shapes.add(it)
+                        android.util.Log.d("LineDrawingView", "Committed new shape (on CANCEL), total shapes=${shapes.size}")
+                    }
                     currentShape = null
                 }
             }
@@ -369,7 +407,16 @@ class LineDrawingView @JvmOverloads constructor(
     }
 
     private fun toNormalized(x: Float, y: Float): PointF {
-        if (contentWidthF <= 0f || contentHeightF <= 0f) return PointF(0f, 0f)
+        // If content rect not yet computed, compute it now based on current view size
+        if (contentWidthF <= 0f || contentHeightF <= 0f) {
+            computeContentRect(width, height)
+        }
+        
+        if (contentWidthF <= 0f || contentHeightF <= 0f) {
+            // If still invalid, use fallback (e.g., view not laid out yet)
+            return PointF(0f, 0f)
+        }
+        
         val nx = ((x - contentLeft) / contentWidthF).coerceIn(0f, 1f)
         val ny = ((y - contentTop) / contentHeightF).coerceIn(0f, 1f)
         return PointF(nx, ny)

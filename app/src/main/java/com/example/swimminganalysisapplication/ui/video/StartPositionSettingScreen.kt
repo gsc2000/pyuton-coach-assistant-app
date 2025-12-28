@@ -4,17 +4,25 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
@@ -47,8 +55,25 @@ fun StartPositionSettingScreen(
 ) {
     val context = LocalContext.current
 
-    var selectedStart1Ms by remember { mutableStateOf(initialStart1Ms) }
-    var selectedStart2Ms by remember { mutableStateOf(initialStart2Ms) }
+    // SavedStateHandle を取得して状態を保持
+    val savedStateHandle = remember { navController.previousBackStackEntry?.savedStateHandle }
+    
+    // 位置合わせポイント（ビデオ上で表示される位置）- SavedStateHandle から復元
+    var alignmentPoint1Ms by remember { 
+        mutableStateOf(savedStateHandle?.get<Long>("alignmentPoint1Ms") ?: initialStart1Ms) 
+    }
+    var alignmentPoint2Ms by remember { 
+        mutableStateOf(savedStateHandle?.get<Long>("alignmentPoint2Ms") ?: initialStart2Ms) 
+    }
+
+    // 共通の開始位置オフセット（秒単位、少数第一位まで） - SavedStateHandle から復元
+    var startOffsetSec by remember { 
+        mutableStateOf(savedStateHandle?.get<Double>("startOffsetSec") ?: 0.0)
+    }
+    
+    // オフセットの最大値を計算（両ビデオの位置合わせポイントの小さい方）
+    val maxOffsetMs = kotlin.math.min(alignmentPoint1Ms, alignmentPoint2Ms)
+    val maxOffsetSec = maxOffsetMs.toDouble() / 1000.0
 
     // ExoPlayer instances for preview (optional, but good for UX)
     // These players will only be used for seeking to show a frame, not for playback.
@@ -68,11 +93,11 @@ fun StartPositionSettingScreen(
     }
 
     // Seek preview players when slider changes
-    LaunchedEffect(selectedStart1Ms) {
-        exoPlayer1Preview?.seekTo(selectedStart1Ms)
+    LaunchedEffect(alignmentPoint1Ms) {
+        exoPlayer1Preview?.seekTo(alignmentPoint1Ms)
     }
-    LaunchedEffect(selectedStart2Ms) {
-        exoPlayer2Preview?.seekTo(selectedStart2Ms)
+    LaunchedEffect(alignmentPoint2Ms) {
+        exoPlayer2Preview?.seekTo(alignmentPoint2Ms)
     }
 
     DisposableEffect(Unit) {
@@ -93,8 +118,18 @@ fun StartPositionSettingScreen(
                 },
                 actions = {
                     Button(onClick = {
-                        navController.previousBackStackEntry?.savedStateHandle?.set("newStart1Ms", selectedStart1Ms)
-                        navController.previousBackStackEntry?.savedStateHandle?.set("newStart2Ms", selectedStart2Ms)
+                        // 状態を SavedStateHandle に保存
+                        savedStateHandle?.set("alignmentPoint1Ms", alignmentPoint1Ms)
+                        savedStateHandle?.set("alignmentPoint2Ms", alignmentPoint2Ms)
+                        savedStateHandle?.set("startOffsetSec", startOffsetSec)
+                        
+                        // オフセットをミリ秒に変換
+                        val offsetMs = (startOffsetSec * 1000.0).toLong()
+                        // 実際の開始位置 = 位置合わせポイント - オフセット
+                        val actualStart1Ms = (alignmentPoint1Ms.toLong() - offsetMs).coerceAtLeast(0L)
+                        val actualStart2Ms = (alignmentPoint2Ms.toLong() - offsetMs).coerceAtLeast(0L)
+                        navController.previousBackStackEntry?.savedStateHandle?.set("newStart1Ms", actualStart1Ms)
+                        navController.previousBackStackEntry?.savedStateHandle?.set("newStart2Ms", actualStart2Ms)
                         navController.popBackStack()
                     }) {
                         Text("完了")
@@ -117,14 +152,27 @@ fun StartPositionSettingScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+            
+            // 共通のオフセット設定（最上部）
+            Text("開始位置オフセット", style = MaterialTheme.typography.titleMedium)
+            OffsetInputField(
+                offsetSec = startOffsetSec,
+                onOffsetChange = { startOffsetSec = it },
+                maxOffsetSec = maxOffsetSec
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            Divider()
+            Spacer(modifier = Modifier.height(8.dp))
+            
             // Video 1 Settings
             if (video1UriString != null && duration1Ms > 0) {
-                Text("ビデオ1 開始位置", style = MaterialTheme.typography.titleMedium)
+                Text("ビデオ1 位置合わせ", style = MaterialTheme.typography.titleMedium)
                 VideoPreviewAndSlider(
                     exoPlayer = exoPlayer1Preview,
-                    selectedStartMs = selectedStart1Ms,
-                    durationMs = duration1Ms,
-                    onValueChange = { selectedStart1Ms = it }
+                    alignmentPointMs = alignmentPoint1Ms,
+                    onAlignmentPointChange = { alignmentPoint1Ms = it },
+                    durationMs = duration1Ms
                 )
             } else if (video1UriString != null) {
                 Text("ビデオ1: 長さ情報なし", style = MaterialTheme.typography.titleMedium)
@@ -133,16 +181,17 @@ fun StartPositionSettingScreen(
 
             // Video 2 Settings
             if (video2UriString != null && duration2Ms > 0) {
-                Text("ビデオ2 開始位置", style = MaterialTheme.typography.titleMedium)
+                Text("ビデオ2 位置合わせ", style = MaterialTheme.typography.titleMedium)
                 VideoPreviewAndSlider(
                     exoPlayer = exoPlayer2Preview,
-                    selectedStartMs = selectedStart2Ms,
-                    durationMs = duration2Ms,
-                    onValueChange = { selectedStart2Ms = it }
+                    alignmentPointMs = alignmentPoint2Ms,
+                    onAlignmentPointChange = { alignmentPoint2Ms = it },
+                    durationMs = duration2Ms
                 )
             } else if (video2UriString != null) {
                 Text("ビデオ2: 長さ情報なし", style = MaterialTheme.typography.titleMedium)
             }
+            
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -151,9 +200,9 @@ fun StartPositionSettingScreen(
 @Composable
 private fun VideoPreviewAndSlider(
     exoPlayer: ExoPlayer?,
-    selectedStartMs: Long,
-    durationMs: Long,
-    onValueChange: (Long) -> Unit
+    alignmentPointMs: Long,
+    onAlignmentPointChange: (Long) -> Unit,
+    durationMs: Long
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -176,13 +225,16 @@ private fun VideoPreviewAndSlider(
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text("開始: ${formatTime(selectedStartMs)} / 総時間: ${formatTime(durationMs)}")
+        Text("位置合わせ: ${formatTime(alignmentPointMs)} / 総時間: ${formatTime(durationMs)}")
+        
+        // 位置合わせポイントスライダー
         Slider(
-            value = if (durationMs > 0) selectedStartMs.toFloat() / durationMs.toFloat() else 0f,
-            onValueChange = { newValue -> onValueChange((newValue * durationMs).toLong()) },
+            value = if (durationMs > 0) alignmentPointMs.toFloat() / durationMs.toFloat() else 0f,
+            onValueChange = { newValue -> onAlignmentPointChange((newValue * durationMs).toLong()) },
             valueRange = 0f..(if (durationMs > 0) 1f else 0f),
             modifier = Modifier.fillMaxWidth()
         )
+        
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             horizontalArrangement = Arrangement.Center,
@@ -190,16 +242,73 @@ private fun VideoPreviewAndSlider(
             modifier = Modifier.fillMaxWidth()
         ) {
             IconButton(onClick = { 
-                val newPos = (selectedStartMs - 33L).coerceAtLeast(0L)
-                onValueChange(newPos)
+                val newPoint = (alignmentPointMs - 33L).coerceAtLeast(0L)
+                onAlignmentPointChange(newPoint)
             }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "前フレーム")
             }
             IconButton(onClick = { 
-                val newPos = (selectedStartMs + 33L).coerceAtMost(durationMs)
-                onValueChange(newPos)
+                val newPoint = (alignmentPointMs + 33L).coerceAtMost(durationMs)
+                onAlignmentPointChange(newPoint)
             }, modifier = Modifier.graphicsLayer(scaleX = -1f)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "次フレーム")
+            }
+        }
+    }
+}
+
+@Composable
+private fun OffsetInputField(
+    offsetSec: Double,
+    onOffsetChange: (Double) -> Unit,
+    maxOffsetSec: Double
+) {
+    var inputText by remember { mutableStateOf(String.format("%.1f", offsetSec)) }
+    
+    LaunchedEffect(offsetSec) {
+        inputText = String.format("%.1f", offsetSec)
+    }
+    
+    fun updateOffset(newValue: Double) {
+        val clamped = newValue.coerceIn(0.0, maxOffsetSec)
+        onOffsetChange(clamped)
+    }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = { updateOffset(offsetSec - 0.1) }) {
+                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "減少")
+            }
+            
+            TextField(
+                value = inputText,
+                onValueChange = { newValue ->
+                    inputText = newValue
+                    val parsed = newValue.toDoubleOrNull()
+                    if (parsed != null) {
+                        // 小数第二位以下は切り捨て
+                        val truncated = (parsed * 10).toLong() / 10.0
+                        updateOffset(truncated)
+                    }
+                },
+                label = { Text("秒") },
+                modifier = Modifier
+                    .width(100.dp),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+            
+            IconButton(onClick = { updateOffset(offsetSec + 0.1) }) {
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "増加")
             }
         }
     }

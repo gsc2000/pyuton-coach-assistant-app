@@ -558,6 +558,40 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         lineDrawingView2.clearSelection()
     }
 
+    // 描画モード変更時にLineDrawingViewの状態を更新
+    LaunchedEffect(isDrawingMode1, drawMode1) {
+        if (isDrawingMode1) {
+            // 描画モード進入時にズームをリセット
+            android.util.Log.d("VideoScreen", "Drawing mode ON for video1, mode=$drawMode1")
+            videoScale1 = 1f
+            videoOffsetX1 = 0f
+            videoOffsetY1 = 0f
+            lineDrawingView1.setZoomInfo(1f, 0f, 0f)
+            lineDrawingView1.setDrawingEnabled(true)
+            lineDrawingView1.setDrawMode(drawMode1)
+        } else {
+            android.util.Log.d("VideoScreen", "Drawing mode OFF for video1")
+            lineDrawingView1.setDrawingEnabled(false)
+        }
+    }
+    
+    LaunchedEffect(isDrawingMode2, drawMode2) {
+        if (isDrawingMode2) {
+            // 描画モード進入時にズームをリセット
+            videoScale2 = 1f
+            videoOffsetX2 = 0f
+            videoOffsetY2 = 0f
+            lineDrawingView2.setZoomInfo(1f, 0f, 0f)
+            lineDrawingView2.setDrawingEnabled(true)
+            lineDrawingView2.setDrawMode(drawMode2)
+        } else {
+            lineDrawingView2.setDrawingEnabled(false)
+        }
+    }
+    
+    // 描画モード中はズーム情報を更新しない
+    // Zoom 変更時の更新は削除（描画モード中のズーム操作は無効化される）
+
     DisposableEffect(videoUri1, exoPlayer1) {
         if (videoUri1 != null && exoPlayer1 == null) {
             initializeOrUpdatePlayer(null, videoUri1, startPosition1Ms, { exoPlayer1 = it }, { videoAspectRatio1 = it }, { originalDuration1Ms = it })
