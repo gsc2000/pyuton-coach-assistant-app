@@ -20,6 +20,15 @@ data class ProjectEntity(
     val alignmentPoint1Ms: Long = 0L,
     val alignmentPoint2Ms: Long = 0L,
     val offsetMs: Long = 0L,
+    // トリミング領域（正規化座標 0.0-1.0）
+    val cropLeft1: Float = 0f,
+    val cropTop1: Float = 0f,
+    val cropRight1: Float = 1f,
+    val cropBottom1: Float = 1f,
+    val cropLeft2: Float = 0f,
+    val cropTop2: Float = 0f,
+    val cropRight2: Float = 1f,
+    val cropBottom2: Float = 1f,
     val drawingsJson: String, // JSON serialized drawings
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()

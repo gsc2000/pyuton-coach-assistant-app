@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") // <- 追加
+    id("kotlin-parcelize") // Parcelize support
     kotlin("plugin.serialization") version "2.0.0" // <- 更新
     id("com.google.devtools.ksp") version "2.0.0-1.0.24" // <- 更新
 }

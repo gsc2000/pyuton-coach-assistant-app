@@ -15,6 +15,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -138,6 +139,7 @@ private fun VideoPlayerBox(
     offsetY: Float = 0f,
     onScaleChange: (Float) -> Unit = {},
     onOffsetChange: (Float, Float) -> Unit = { _, _ -> },
+    cropRect: CropRect = CropRect(),
     modifier: Modifier = Modifier
 ) {
     // Keep track of previous scale/offset for gesture calculations
@@ -216,33 +218,76 @@ private fun VideoPlayerBox(
                     translationY = if (scale <= 1f) 0f else offsetY
                 )
         ) {
+            // クロップ領域の計算
+            val cropWidth = cropRect.right - cropRect.left
+            val cropHeight = cropRect.bottom - cropRect.top
+            val hasCrop = cropWidth < 1f || cropHeight < 1f
+            
+            // 元の動画のアスペクト比とクロップ領域のアスペクト比を計算
+            val originalAspectRatio = videoAspectRatio ?: (16f / 9f)
+            val cropAspectRatio = if (hasCrop && cropHeight > 0f) cropWidth / cropHeight else originalAspectRatio
+            
+            // クロップ領域のアスペクト比が元の動画より横長か縦長かを判定
+            // 横長の場合は横幅を基準、縦長の場合は縦幅を基準にスケーリング
+            val cropScale = if (hasCrop) {
+                if (cropAspectRatio > originalAspectRatio) {
+                    // 横長にクロップ → 横幅を基準にスケール
+                    1f / cropWidth
+                } else {
+                    // 縦長にクロップ → 縦幅を基準にスケール
+                    1f / cropHeight
+                }
+            } else {
+                1f
+            }
+            
+            // クロップ適用時のオフセット計算
+            // クロップ領域の中心を画面中心に配置
+            val cropCenterX = (cropRect.left + cropRect.right) / 2f
+            val cropCenterY = (cropRect.top + cropRect.bottom) / 2f
+            val cropTranslationX = if (hasCrop) (0.5f - cropCenterX) * cropScale else 0f
+            val cropTranslationY = if (hasCrop) (0.5f - cropCenterY) * cropScale else 0f
+            
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(videoAspectRatio ?: 16f / 9f)
+                    .aspectRatio(originalAspectRatio)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (exoPlayer != null) {
-                    AndroidView(
-                        factory = { context ->
-                            TextureView(context)
-                        },
-                        update = { textureView ->
-                            exoPlayer.setVideoTextureView(textureView)
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    AndroidView(
-                        factory = { lineDrawingView },
-                        modifier = Modifier.fillMaxSize(),
-                        update = { view ->
-                            view.setDrawingEnabled(isDrawingMode)
-                            view.setDrawMode(drawMode)
-                            view.setVideoAspectRatio(videoAspectRatio)
-                            view.setZoomInfo(scale, offsetX, offsetY)
-                        }
-                    )
+                    // クロップを適用したコンテナ
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = cropScale
+                                scaleY = cropScale
+                                translationX = cropTranslationX * size.width
+                                translationY = cropTranslationY * size.height
+                                clip = true
+                            }
+                    ) {
+                        AndroidView(
+                            factory = { context ->
+                                TextureView(context)
+                            },
+                            update = { textureView ->
+                                exoPlayer.setVideoTextureView(textureView)
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        AndroidView(
+                            factory = { lineDrawingView },
+                            modifier = Modifier.fillMaxSize(),
+                            update = { view ->
+                                view.setDrawingEnabled(isDrawingMode)
+                                view.setDrawMode(drawMode)
+                                view.setVideoAspectRatio(videoAspectRatio)
+                                view.setZoomInfo(scale, offsetX, offsetY)
+                            }
+                        )
+                    }
                     if (durationOfTrimmedView > 0L) {
                         LinearProgressIndicator(
                             progress = { currentPositionInTrimmedView.toFloat() / durationOfTrimmedView.toFloat() },
@@ -342,6 +387,10 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     var alignmentPoint2Ms by rememberSaveable { mutableStateOf(0L) }
     var isDrawingMode2 by rememberSaveable { mutableStateOf(false) }
     var drawMode2 by remember { mutableStateOf(DrawMode.FREE) }
+    
+    // トリミング領域の状態
+    var cropRect1 by remember { mutableStateOf(CropRect()) }
+    var cropRect2 by remember { mutableStateOf(CropRect()) }
 
     // 共通のオフセット値（個別に管理する必要はない）
     var offsetMs by rememberSaveable { mutableStateOf(0L) }
@@ -402,6 +451,22 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 startPosition1Ms = project.startPosition1Ms
                 startPosition2Ms = project.startPosition2Ms
                 Log.d(TAG, "LaunchedEffect(projectId): Using startPos1=$startPosition1Ms, startPos2=$startPosition2Ms from DB")
+                
+                // Restore crop rectangles
+                cropRect1 = CropRect(
+                    left = project.cropLeft1,
+                    top = project.cropTop1,
+                    right = project.cropRight1,
+                    bottom = project.cropBottom1
+                )
+                cropRect2 = CropRect(
+                    left = project.cropLeft2,
+                    top = project.cropTop2,
+                    right = project.cropRight2,
+                    bottom = project.cropBottom2
+                )
+                Log.d(TAG, "LaunchedEffect(projectId): Restored cropRect1=$cropRect1, cropRect2=$cropRect2")
+                
                 // remember loaded project for potential overwrite
                 loadedProject = project
                 // prefill save dialog name
@@ -446,6 +511,18 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                         offsetMs = newOffset
                         Log.d(TAG, "ON_RESUME: Restored alignment points and offset: align1=$alignmentPoint1Ms, offset=$offsetMs, align2=$alignmentPoint2Ms")
                     }
+                    
+                    // Restore crop rectangles if available
+                    val newCropRect1 = currentBackStackEntry.savedStateHandle.get<CropRect>("cropRect1")
+                    val newCropRect2 = currentBackStackEntry.savedStateHandle.get<CropRect>("cropRect2")
+                    if (newCropRect1 != null) {
+                        cropRect1 = newCropRect1
+                        Log.d(TAG, "ON_RESUME: Restored cropRect1=$cropRect1")
+                    }
+                    if (newCropRect2 != null) {
+                        cropRect2 = newCropRect2
+                        Log.d(TAG, "ON_RESUME: Restored cropRect2=$cropRect2")
+                    }
 
                     startPosition1Ms = min(newStart1, (originalDuration1Ms - 1L).coerceAtLeast(0L))
                     startPosition2Ms = min(newStart2, (originalDuration2Ms - 1L).coerceAtLeast(0L))
@@ -457,6 +534,8 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                     currentBackStackEntry.savedStateHandle.remove<Long>("alignmentPoint2Ms")
                     currentBackStackEntry.savedStateHandle.remove<Long>("offset1Ms")
                     currentBackStackEntry.savedStateHandle.remove<Long>("offset2Ms")
+                    currentBackStackEntry.savedStateHandle.remove<CropRect>("cropRect1")
+                    currentBackStackEntry.savedStateHandle.remove<CropRect>("cropRect2")
 
                     sharedCurrentPositionMs = 0L
                     isPlaying = false
@@ -934,6 +1013,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 offsetY = videoOffsetY1,
                                 onScaleChange = { videoScale1 = it },
                                 onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
+                                cropRect = cropRect1,
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
                             )
                             if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier.width(4.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
@@ -955,6 +1035,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 offsetY = videoOffsetY2,
                                 onScaleChange = { videoScale2 = it },
                                 onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
+                                cropRect = cropRect2,
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
                             )
                         }
@@ -989,6 +1070,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     offsetY = videoOffsetY1,
                                     onScaleChange = { videoScale1 = it },
                                     onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
+                                    cropRect = cropRect1,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -1012,6 +1094,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     offsetY = videoOffsetY2,
                                     onScaleChange = { videoScale2 = it },
                                     onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
+                                    cropRect = cropRect2,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -1041,6 +1124,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 offsetY = videoOffsetY1,
                                 onScaleChange = { videoScale1 = it },
                                 onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
+                                cropRect = cropRect1,
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                             VideoPlayerBox(
@@ -1061,6 +1145,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 offsetY = videoOffsetY2,
                                 onScaleChange = { videoScale2 = it },
                                 onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
+                                cropRect = cropRect2,
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                         }
@@ -1114,6 +1199,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                         currentBackStackEntry?.savedStateHandle?.set("alignmentPoint1Ms", alignmentPoint1Ms)
                         currentBackStackEntry?.savedStateHandle?.set("alignmentPoint2Ms", alignmentPoint2Ms)
                         currentBackStackEntry?.savedStateHandle?.set("offset1Ms", offsetMs) // Common offset
+                        // Save crop rectangles
+                        currentBackStackEntry?.savedStateHandle?.set("cropRect1", cropRect1)
+                        currentBackStackEntry?.savedStateHandle?.set("cropRect2", cropRect2)
                         
                         val encodedUri1 = videoUri1?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
                         val encodedUri2 = videoUri2?.let { URLEncoder.encode(it.toString(), StandardCharsets.UTF_8.toString()) } ?: "null"
@@ -1191,6 +1279,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     alignmentPoint1Ms = alignmentPoint1Ms,
                                     alignmentPoint2Ms = alignmentPoint2Ms,
                                     offsetMs = offsetMs,
+                                    cropLeft1 = cropRect1.left,
+                                    cropTop1 = cropRect1.top,
+                                    cropRight1 = cropRect1.right,
+                                    cropBottom1 = cropRect1.bottom,
+                                    cropLeft2 = cropRect2.left,
+                                    cropTop2 = cropRect2.top,
+                                    cropRight2 = cropRect2.right,
+                                    cropBottom2 = cropRect2.bottom,
                                     drawingsJson = combinedDrawings,
                                     createdAt = loadedProject!!.createdAt,
                                     updatedAt = System.currentTimeMillis()
@@ -1266,6 +1362,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                         alignmentPoint1Ms = alignmentPoint1Ms,
                                         alignmentPoint2Ms = alignmentPoint2Ms,
                                         offsetMs = offsetMs,
+                                        cropLeft1 = cropRect1.left,
+                                        cropTop1 = cropRect1.top,
+                                        cropRight1 = cropRect1.right,
+                                        cropBottom1 = cropRect1.bottom,
+                                        cropLeft2 = cropRect2.left,
+                                        cropTop2 = cropRect2.top,
+                                        cropRight2 = cropRect2.right,
+                                        cropBottom2 = cropRect2.bottom,
                                         drawingsJson = combinedDrawings
                                     )
                                     android.util.Log.d("VideoScreen", "Creating new project: name=${project.name}, align1=${project.alignmentPoint1Ms}, offset=${project.offsetMs}, align2=${project.alignmentPoint2Ms}")
