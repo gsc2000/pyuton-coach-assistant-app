@@ -161,15 +161,8 @@ fun StartPositionSettingScreen(
                 kotlinx.coroutines.delay(100)
             }
             player.videoFormat?.let { format ->
-                Log.d("StartPositionSetting", "Video1 format - width: ${format.width}, height: ${format.height}, rotationDegrees: ${format.rotationDegrees}, pixelWidthHeightRatio: ${format.pixelWidthHeightRatio}")
-                // rotationDegreesが90または270度の場合、widthとheightを入れ替える
-                val (effectiveWidth, effectiveHeight) = if (format.rotationDegrees == 90 || format.rotationDegrees == 270) {
-                    Pair(format.height, format.width)
-                } else {
-                    Pair(format.width, format.height)
-                }
-                videoAspectRatio1 = (effectiveWidth.toFloat() * format.pixelWidthHeightRatio) / effectiveHeight.toFloat()
-                Log.d("StartPositionSetting", "Video1 aspect ratio: $videoAspectRatio1 (effectiveWidth: $effectiveWidth, effectiveHeight: $effectiveHeight)")
+                videoAspectRatio1 = format.width.toFloat() / format.height.toFloat()
+                Log.d("StartPositionSetting", "Video1 aspect ratio: $videoAspectRatio1")
             }
         }
     }
@@ -180,15 +173,8 @@ fun StartPositionSettingScreen(
                 kotlinx.coroutines.delay(100)
             }
             player.videoFormat?.let { format ->
-                Log.d("StartPositionSetting", "Video2 format - width: ${format.width}, height: ${format.height}, rotationDegrees: ${format.rotationDegrees}, pixelWidthHeightRatio: ${format.pixelWidthHeightRatio}")
-                // rotationDegreesが90または270度の場合、widthとheightを入れ替える
-                val (effectiveWidth, effectiveHeight) = if (format.rotationDegrees == 90 || format.rotationDegrees == 270) {
-                    Pair(format.height, format.width)
-                } else {
-                    Pair(format.width, format.height)
-                }
-                videoAspectRatio2 = (effectiveWidth.toFloat() * format.pixelWidthHeightRatio) / effectiveHeight.toFloat()
-                Log.d("StartPositionSetting", "Video2 aspect ratio: $videoAspectRatio2 (effectiveWidth: $effectiveWidth, effectiveHeight: $effectiveHeight)")
+                videoAspectRatio2 = format.width.toFloat() / format.height.toFloat()
+                Log.d("StartPositionSetting", "Video2 aspect ratio: $videoAspectRatio2")
             }
         }
     }
@@ -464,11 +450,6 @@ private fun CropOverlay(
     val handleSize = 24.dp
     val minSize = 0.1f // 最小サイズ 10%
     
-    // アスペクト比をログ出力
-    LaunchedEffect(videoAspectRatio) {
-        Log.d("CropOverlay", "Using video aspect ratio: $videoAspectRatio")
-    }
-    
     // ドラッグ中のハンドルタイプを記憶
     var dragMode by remember { mutableStateOf<DragMode>(DragMode.None) }
     
@@ -575,41 +556,25 @@ private fun CropOverlay(
                             val fixedX = currentCropRect.right
                             val fixedY = currentCropRect.bottom
                             
-                            // ドラッグ量の絶対値を比較して、主方向を判断
-                            val absDx = kotlin.math.abs(dx)
-                            val absDy = kotlin.math.abs(dy)
+                            // 新しい左上の位置
+                            val maxLeft = (fixedX - minSize).coerceAtLeast(0f)
+                            val maxTop = (fixedY - minSize).coerceAtLeast(0f)
+                            var newLeftPos = (currentCropRect.left + dx).coerceIn(0f, maxLeft)
+                            var newTopPos = (currentCropRect.top + dy).coerceIn(0f, maxTop)
                             
-                            var newLeftPos: Float
-                            var newTopPos: Float
+                            // 幅と高さを計算
+                            val width = (fixedX - newLeftPos).coerceAtLeast(minSize)
                             
-                            if (absDx > absDy) {
-                                // 横方向のドラッグが主：幅を基準に高さを計算
-                                newLeftPos = (currentCropRect.left + dx).coerceIn(0f, (fixedX - minSize).coerceAtLeast(0f))
-                                val rectWidth = fixedX - newLeftPos
-                                val rectHeight = rectWidth / videoAspectRatio
-                                newTopPos = (fixedY - rectHeight).coerceIn(0f, (fixedY - minSize).coerceAtLeast(0f))
-                                
-                                // 高さが範囲外の場合は幅を調整
-                                if (newTopPos <= 0f) {
-                                    newTopPos = 0f
-                                    val actualHeight = fixedY - newTopPos
-                                    val actualWidth = actualHeight * videoAspectRatio
-                                    newLeftPos = (fixedX - actualWidth).coerceAtLeast(0f)
-                                }
+                            // アスペクト比を保持：幅を基準に高さを調整
+                            val requiredHeight = width / videoAspectRatio
+                            if (fixedY - requiredHeight >= 0f) {
+                                newTopPos = fixedY - requiredHeight
                             } else {
-                                // 縦方向のドラッグが主：高さを基準に幅を計算
-                                newTopPos = (currentCropRect.top + dy).coerceIn(0f, (fixedY - minSize).coerceAtLeast(0f))
-                                val rectHeight = fixedY - newTopPos
-                                val rectWidth = rectHeight * videoAspectRatio
-                                newLeftPos = (fixedX - rectWidth).coerceIn(0f, (fixedX - minSize).coerceAtLeast(0f))
-                                
-                                // 幅が範囲外の場合は高さを調整
-                                if (newLeftPos <= 0f) {
-                                    newLeftPos = 0f
-                                    val actualWidth = fixedX - newLeftPos
-                                    val actualHeight = actualWidth / videoAspectRatio
-                                    newTopPos = (fixedY - actualHeight).coerceAtLeast(0f)
-                                }
+                                // 高さが足りない場合は、高さを基準に幅を調整
+                                newTopPos = 0f
+                                val actualHeight = fixedY - newTopPos
+                                val requiredWidth = actualHeight * videoAspectRatio
+                                newLeftPos = (fixedX - requiredWidth).coerceAtLeast(0f)
                             }
                             
                             newLeft = newLeftPos
@@ -623,38 +588,22 @@ private fun CropOverlay(
                             val fixedX = currentCropRect.left
                             val fixedY = currentCropRect.bottom
                             
-                            val absDx = kotlin.math.abs(dx)
-                            val absDy = kotlin.math.abs(dy)
+                            val minRight = (fixedX + minSize).coerceAtMost(1f)
+                            val maxTop = (fixedY - minSize).coerceAtLeast(0f)
+                            var newRightPos = (currentCropRect.right + dx).coerceIn(minRight, 1f)
+                            var newTopPos = (currentCropRect.top + dy).coerceIn(0f, maxTop)
                             
-                            var newRightPos: Float
-                            var newTopPos: Float
+                            val width = (newRightPos - fixedX).coerceAtLeast(minSize)
                             
-                            if (absDx > absDy) {
-                                // 横方向のドラッグが主
-                                newRightPos = (currentCropRect.right + dx).coerceIn((fixedX + minSize).coerceAtMost(1f), 1f)
-                                val rectWidth = newRightPos - fixedX
-                                val rectHeight = rectWidth / videoAspectRatio
-                                newTopPos = (fixedY - rectHeight).coerceIn(0f, (fixedY - minSize).coerceAtLeast(0f))
-                                
-                                if (newTopPos <= 0f) {
-                                    newTopPos = 0f
-                                    val actualHeight = fixedY - newTopPos
-                                    val actualWidth = actualHeight * videoAspectRatio
-                                    newRightPos = (fixedX + actualWidth).coerceAtMost(1f)
-                                }
+                            // アスペクト比を保持
+                            val requiredHeight = width / videoAspectRatio
+                            if (fixedY - requiredHeight >= 0f) {
+                                newTopPos = fixedY - requiredHeight
                             } else {
-                                // 縦方向のドラッグが主
-                                newTopPos = (currentCropRect.top + dy).coerceIn(0f, (fixedY - minSize).coerceAtLeast(0f))
-                                val rectHeight = fixedY - newTopPos
-                                val rectWidth = rectHeight * videoAspectRatio
-                                newRightPos = (fixedX + rectWidth).coerceIn((fixedX + minSize).coerceAtMost(1f), 1f)
-                                
-                                if (newRightPos >= 1f) {
-                                    newRightPos = 1f
-                                    val actualWidth = newRightPos - fixedX
-                                    val actualHeight = actualWidth / videoAspectRatio
-                                    newTopPos = (fixedY - actualHeight).coerceAtLeast(0f)
-                                }
+                                newTopPos = 0f
+                                val actualHeight = fixedY - newTopPos
+                                val requiredWidth = actualHeight * videoAspectRatio
+                                newRightPos = (fixedX + requiredWidth).coerceAtMost(1f)
                             }
                             
                             newLeft = fixedX
@@ -668,38 +617,22 @@ private fun CropOverlay(
                             val fixedX = currentCropRect.right
                             val fixedY = currentCropRect.top
                             
-                            val absDx = kotlin.math.abs(dx)
-                            val absDy = kotlin.math.abs(dy)
+                            val maxLeft = (fixedX - minSize).coerceAtLeast(0f)
+                            val minBottom = (fixedY + minSize).coerceAtMost(1f)
+                            var newLeftPos = (currentCropRect.left + dx).coerceIn(0f, maxLeft)
+                            var newBottomPos = (currentCropRect.bottom + dy).coerceIn(minBottom, 1f)
                             
-                            var newLeftPos: Float
-                            var newBottomPos: Float
+                            val width = (fixedX - newLeftPos).coerceAtLeast(minSize)
                             
-                            if (absDx > absDy) {
-                                // 横方向のドラッグが主
-                                newLeftPos = (currentCropRect.left + dx).coerceIn(0f, (fixedX - minSize).coerceAtLeast(0f))
-                                val rectWidth = fixedX - newLeftPos
-                                val rectHeight = rectWidth / videoAspectRatio
-                                newBottomPos = (fixedY + rectHeight).coerceIn((fixedY + minSize).coerceAtMost(1f), 1f)
-                                
-                                if (newBottomPos >= 1f) {
-                                    newBottomPos = 1f
-                                    val actualHeight = newBottomPos - fixedY
-                                    val actualWidth = actualHeight * videoAspectRatio
-                                    newLeftPos = (fixedX - actualWidth).coerceAtLeast(0f)
-                                }
+                            // アスペクト比を保持
+                            val requiredHeight = width / videoAspectRatio
+                            if (fixedY + requiredHeight <= 1f) {
+                                newBottomPos = fixedY + requiredHeight
                             } else {
-                                // 縦方向のドラッグが主
-                                newBottomPos = (currentCropRect.bottom + dy).coerceIn((fixedY + minSize).coerceAtMost(1f), 1f)
-                                val rectHeight = newBottomPos - fixedY
-                                val rectWidth = rectHeight * videoAspectRatio
-                                newLeftPos = (fixedX - rectWidth).coerceIn(0f, (fixedX - minSize).coerceAtLeast(0f))
-                                
-                                if (newLeftPos <= 0f) {
-                                    newLeftPos = 0f
-                                    val actualWidth = fixedX - newLeftPos
-                                    val actualHeight = actualWidth / videoAspectRatio
-                                    newBottomPos = (fixedY + actualHeight).coerceAtMost(1f)
-                                }
+                                newBottomPos = 1f
+                                val actualHeight = newBottomPos - fixedY
+                                val requiredWidth = actualHeight * videoAspectRatio
+                                newLeftPos = (fixedX - requiredWidth).coerceAtLeast(0f)
                             }
                             
                             newLeft = newLeftPos
@@ -713,38 +646,22 @@ private fun CropOverlay(
                             val fixedX = currentCropRect.left
                             val fixedY = currentCropRect.top
                             
-                            val absDx = kotlin.math.abs(dx)
-                            val absDy = kotlin.math.abs(dy)
+                            val minRight = (fixedX + minSize).coerceAtMost(1f)
+                            val minBottom = (fixedY + minSize).coerceAtMost(1f)
+                            var newRightPos = (currentCropRect.right + dx).coerceIn(minRight, 1f)
+                            var newBottomPos = (currentCropRect.bottom + dy).coerceIn(minBottom, 1f)
                             
-                            var newRightPos: Float
-                            var newBottomPos: Float
+                            val width = (newRightPos - fixedX).coerceAtLeast(minSize)
                             
-                            if (absDx > absDy) {
-                                // 横方向のドラッグが主
-                                newRightPos = (currentCropRect.right + dx).coerceIn((fixedX + minSize).coerceAtMost(1f), 1f)
-                                val rectWidth = newRightPos - fixedX
-                                val rectHeight = rectWidth / videoAspectRatio
-                                newBottomPos = (fixedY + rectHeight).coerceIn((fixedY + minSize).coerceAtMost(1f), 1f)
-                                
-                                if (newBottomPos >= 1f) {
-                                    newBottomPos = 1f
-                                    val actualHeight = newBottomPos - fixedY
-                                    val actualWidth = actualHeight * videoAspectRatio
-                                    newRightPos = (fixedX + actualWidth).coerceAtMost(1f)
-                                }
+                            // アスペクト比を保持
+                            val requiredHeight = width / videoAspectRatio
+                            if (fixedY + requiredHeight <= 1f) {
+                                newBottomPos = fixedY + requiredHeight
                             } else {
-                                // 縦方向のドラッグが主
-                                newBottomPos = (currentCropRect.bottom + dy).coerceIn((fixedY + minSize).coerceAtMost(1f), 1f)
-                                val rectHeight = newBottomPos - fixedY
-                                val rectWidth = rectHeight * videoAspectRatio
-                                newRightPos = (fixedX + rectWidth).coerceIn((fixedX + minSize).coerceAtMost(1f), 1f)
-                                
-                                if (newRightPos >= 1f) {
-                                    newRightPos = 1f
-                                    val actualWidth = newRightPos - fixedX
-                                    val actualHeight = actualWidth / videoAspectRatio
-                                    newBottomPos = (fixedY + actualHeight).coerceAtMost(1f)
-                                }
+                                newBottomPos = 1f
+                                val actualHeight = newBottomPos - fixedY
+                                val requiredWidth = actualHeight * videoAspectRatio
+                                newRightPos = (fixedX + requiredWidth).coerceAtMost(1f)
                             }
                             
                             newLeft = fixedX
