@@ -2,6 +2,7 @@ package com.example.swimminganalysisapplication.ui.video
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -35,6 +36,7 @@ import androidx.navigation.NavController
 import com.example.swimminganalysisapplication.ui.common.AccountActionsMenu // ★ AccountActionsMenu をインポート
 import com.example.swimminganalysisapplication.ui.theme.CustomTopAppBarHeight
 import com.example.swimminganalysisapplication.ui.theme.getCustomTopAppBarColors
+import com.example.swimminganalysisapplication.util.AppLog
 
 // Helper function to format time (can be moved to a common utils file if used elsewhere)
 private fun formatTime(millis: Long): String {
@@ -81,28 +83,44 @@ fun StartPositionSettingScreen(
     val maxOffsetMs = kotlin.math.min(alignmentPoint1Ms, alignmentPoint2Ms)
     val maxOffsetSec = maxOffsetMs.toDouble() / 1000.0
 
-    // ExoPlayer instances for preview (optional, but good for UX)
-    // These players will only be used for seeking to show a frame, not for playback.
-    val exoPlayer1Preview = remember {
-        video1UriString?.let { ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(it)))
-            prepare()
-            playWhenReady = false
-        }}
+    // ExoPlayer instances - 遅延初期化でメモリ節約
+    var exoPlayer1Preview by remember { mutableStateOf<ExoPlayer?>(null) }
+    var exoPlayer2Preview by remember { mutableStateOf<ExoPlayer?>(null) }
+    
+    // ExoPlayerの初期化を遅延させる
+    fun ensurePlayer1() {
+        if (exoPlayer1Preview == null && video1UriString != null) {
+            exoPlayer1Preview = ExoPlayer.Builder(context)
+                .build()
+                .apply {
+                    setMediaItem(MediaItem.fromUri(Uri.parse(video1UriString)))
+                    prepare()
+                    playWhenReady = false
+                }
+        }
     }
-    val exoPlayer2Preview = remember {
-        video2UriString?.let { ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(it)))
-            prepare()
-            playWhenReady = false
-        }}
+    
+    fun ensurePlayer2() {
+        if (exoPlayer2Preview == null && video2UriString != null) {
+            exoPlayer2Preview = ExoPlayer.Builder(context)
+                .build()
+                .apply {
+                    setMediaItem(MediaItem.fromUri(Uri.parse(video2UriString)))
+                    prepare()
+                    playWhenReady = false
+                }
+        }
     }
-
-    // Seek preview players when slider changes
-    LaunchedEffect(alignmentPoint1Ms) {
+    
+    // ビデオ1の初期化とシーク（画面起動時のみ）
+    LaunchedEffect(Unit) {
+        ensurePlayer1()
         exoPlayer1Preview?.seekTo(alignmentPoint1Ms)
     }
-    LaunchedEffect(alignmentPoint2Ms) {
+    
+    // ビデオ2の初期化とシーク（画面起動時のみ）
+    LaunchedEffect(Unit) {
+        ensurePlayer2()
         exoPlayer2Preview?.seekTo(alignmentPoint2Ms)
     }
 
@@ -185,18 +203,27 @@ fun StartPositionSettingScreen(
                 Text("ビデオ1: 長さ情報なし", style = MaterialTheme.typography.titleMedium)
             }
 
-
             // Video 2 Settings
-            if (video2UriString != null && duration2Ms > 0) {
-                Text("ビデオ2 位置合わせ", style = MaterialTheme.typography.titleMedium)
-                VideoPreviewAndSlider(
-                    exoPlayer = exoPlayer2Preview,
-                    alignmentPointMs = alignmentPoint2Ms,
-                    onAlignmentPointChange = { alignmentPoint2Ms = it },
-                    durationMs = duration2Ms
-                )
-            } else if (video2UriString != null) {
-                Text("ビデオ2: 長さ情報なし", style = MaterialTheme.typography.titleMedium)
+            if (video2UriString != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text("ビデオ2 位置合わせ", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+                
+                if (duration2Ms > 0) {
+                    VideoPreviewAndSlider(
+                        exoPlayer = exoPlayer2Preview,
+                        alignmentPointMs = alignmentPoint2Ms,
+                        onAlignmentPointChange = { newValue ->
+                            alignmentPoint2Ms = newValue
+                            exoPlayer2Preview?.seekTo(newValue)
+                        },
+                        durationMs = duration2Ms
+                    )
+                } else {
+                    Text("ビデオ2: 長さ情報なし")
+                }
             }
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -211,6 +238,13 @@ private fun VideoPreviewAndSlider(
     onAlignmentPointChange: (Long) -> Unit,
     durationMs: Long
 ) {
+    // スライダードラッグ中の一時的な値（更新頻度削減のため）
+    var tempSliderValue by remember { mutableStateOf(alignmentPointMs) }
+    var isSliderDragging by remember { mutableStateOf(false) }
+    
+    // スライダーが離された時のみ実際の値を更新
+    val displayedValue = if (isSliderDragging) tempSliderValue else alignmentPointMs
+    
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -232,12 +266,19 @@ private fun VideoPreviewAndSlider(
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text("位置合わせ: ${formatTime(alignmentPointMs)} / 総時間: ${formatTime(durationMs)}")
+        Text("位置合わせ: ${formatTime(displayedValue)} / 総時間: ${formatTime(durationMs)}")
         
-        // 位置合わせポイントスライダー
+        // 位置合わせポイントスライダー（ドラッグ中は更新を保留）
         Slider(
-            value = if (durationMs > 0) alignmentPointMs.toFloat() / durationMs.toFloat() else 0f,
-            onValueChange = { newValue -> onAlignmentPointChange((newValue * durationMs).toLong()) },
+            value = if (durationMs > 0) displayedValue.toFloat() / durationMs.toFloat() else 0f,
+            onValueChange = { newValue -> 
+                isSliderDragging = true
+                tempSliderValue = (newValue * durationMs).toLong()
+            },
+            onValueChangeFinished = {
+                isSliderDragging = false
+                onAlignmentPointChange(tempSliderValue)
+            },
             valueRange = 0f..(if (durationMs > 0) 1f else 0f),
             modifier = Modifier.fillMaxWidth()
         )

@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Log
 import android.view.TextureView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
@@ -16,7 +15,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.BorderColor
+import com.example.swimminganalysisapplication.util.AppLog
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
@@ -133,44 +132,8 @@ private fun VideoPlayerBox(
     layoutMode: VideoLayoutMode,
     onClearLines: () -> Unit,
     lineDrawingView: LineDrawingView,
-    scale: Float = 1f,
-    offsetX: Float = 0f,
-    offsetY: Float = 0f,
-    onScaleChange: (Float) -> Unit = {},
-    onOffsetChange: (Float, Float) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    // Keep track of previous scale/offset for gesture calculations
-    var previousScale by remember { mutableStateOf(scale) }
-    var previousOffsetX by remember { mutableStateOf(offsetX) }
-    var previousOffsetY by remember { mutableStateOf(offsetY) }
-    
-    // Update previous values when state changes
-    LaunchedEffect(scale, offsetX, offsetY) {
-        previousScale = scale
-        previousOffsetX = offsetX
-        previousOffsetY = offsetY
-    }
-    
-    // Reset zoom when entering drawing mode for stable drawing
-    LaunchedEffect(isDrawingMode) {
-        if (isDrawingMode && scale > 1f) {
-            onScaleChange(1f)
-            onOffsetChange(0f, 0f)
-            previousScale = 1f
-            previousOffsetX = 0f
-            previousOffsetY = 0f
-        }
-    }
-    
-    // Calculate constrained offset to prevent panning outside the visible area
-    // The offset is constrained so the scaled content doesn't go outside the visible bounds
-    fun constrainOffset(offset: Float, scale: Float, size: Float): Float {
-        if (scale <= 1f) return 0f
-        // Maximum offset is half the scaled size minus half the original size
-        val maxOffset = (size * (scale - 1f)) / 2f
-        return offset.coerceIn(-maxOffset, maxOffset)
-    }
 
     Column(modifier = modifier) {
         Box(
@@ -181,40 +144,6 @@ private fun VideoPlayerBox(
                     color = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 )
                 .clip(RectangleShape)
-                .pointerInput(Unit) {
-                    detectTransformGestures { centroid, pan, gestureZoom, rotation ->
-                        // Disable zoom/pan in drawing mode
-                        if (isDrawingMode) return@detectTransformGestures
-                        
-                        // Use the actual current values, not captured ones
-                        val newScale = (previousScale * gestureZoom).coerceIn(1f, 5f)
-                        onScaleChange(newScale)
-                        previousScale = newScale
-                        
-                        // Handle pan - only pan when zoomed in
-                        if (previousScale > 1f) {
-                            val newOffsetX = previousOffsetX + pan.x
-                            val newOffsetY = previousOffsetY + pan.y
-                            // Constrain offsets to keep content within bounds using the pointer size
-                            val constrainedX = constrainOffset(newOffsetX, previousScale, this.size.width.toFloat())
-                            val constrainedY = constrainOffset(newOffsetY, previousScale, this.size.height.toFloat())
-                            onOffsetChange(constrainedX, constrainedY)
-                            previousOffsetX = constrainedX
-                            previousOffsetY = constrainedY
-                        } else {
-                            // Reset offset when scale is 1 or less
-                            onOffsetChange(0f, 0f)
-                            previousOffsetX = 0f
-                            previousOffsetY = 0f
-                        }
-                    }
-                }
-                .graphicsLayer(
-                    scaleX = scale.coerceAtLeast(1f),
-                    scaleY = scale.coerceAtLeast(1f),
-                    translationX = if (scale <= 1f) 0f else offsetX,
-                    translationY = if (scale <= 1f) 0f else offsetY
-                )
         ) {
             Box(
                 modifier = Modifier
@@ -240,7 +169,6 @@ private fun VideoPlayerBox(
                             view.setDrawingEnabled(isDrawingMode)
                             view.setDrawMode(drawMode)
                             view.setVideoAspectRatio(videoAspectRatio)
-                            view.setZoomInfo(scale, offsetX, offsetY)
                         }
                     )
                     if (durationOfTrimmedView > 0L) {
@@ -294,7 +222,7 @@ private fun launchCameraAction(
     if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
         val takeVideoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
         if (takeVideoIntent.resolveActivity(context.packageManager) != null) actionLauncher.launch(takeVideoIntent)
-        else Log.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video $videoIndex")
+        else AppLog.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video $videoIndex")
     } else permRequester.launch(permission)
 }
 
@@ -350,14 +278,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
     var overlayAlpha by rememberSaveable { mutableStateOf(0.5f) }
 
-    // Pinch zoom state for each video player
-    var videoScale1 by remember { mutableStateOf(1f) }
-    var videoOffsetX1 by remember { mutableStateOf(0f) }
-    var videoOffsetY1 by remember { mutableStateOf(0f) }
-    var videoScale2 by remember { mutableStateOf(1f) }
-    var videoOffsetX2 by remember { mutableStateOf(0f) }
-    var videoOffsetY2 by remember { mutableStateOf(0f) }
-
     var sharedCurrentPositionMs by rememberSaveable { mutableStateOf(0L) }
     var sharedMaxDurationMs by rememberSaveable { mutableStateOf(0L) }
     var isSeeking by remember { mutableStateOf(false) } // Used to prevent position updates during seek
@@ -384,14 +304,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     // Load project if projectId is provided
     LaunchedEffect(projectId) {
         if (projectId != null) {
-            Log.d(TAG, "LaunchedEffect(projectId): Starting project load, projectId=$projectId")
+            AppLog.d(TAG, "LaunchedEffect(projectId): Starting project load, projectId=$projectId")
             val db = AppDatabase.getDatabase(context)
             val repository = ProjectRepository(db.projectDao())
             val project = repository.getProjectById(projectId)
             if (project != null) {
-                Log.d(TAG, "LaunchedEffect(projectId): Loaded project: name=${project.name}")
-                Log.d(TAG, "LaunchedEffect(projectId): align1=${project.alignmentPoint1Ms}ms, offset=${project.offsetMs}ms, align2=${project.alignmentPoint2Ms}ms")
-                Log.d(TAG, "LaunchedEffect(projectId): startPos1=${project.startPosition1Ms}ms, startPos2=${project.startPosition2Ms}ms (from DB)")
+                AppLog.d(TAG, "LaunchedEffect(projectId): Loaded project: name=${project.name}")
+                AppLog.d(TAG, "LaunchedEffect(projectId): align1=${project.alignmentPoint1Ms}ms, offset=${project.offsetMs}ms, align2=${project.alignmentPoint2Ms}ms")
+                AppLog.d(TAG, "LaunchedEffect(projectId): startPos1=${project.startPosition1Ms}ms, startPos2=${project.startPosition2Ms}ms (from DB)")
                 videoUri1 = Uri.parse(project.videoUri1)
                 videoUri2 = Uri.parse(project.videoUri2)
                 // Restore alignment points and common offset
@@ -401,7 +321,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 // Use startPosition from DB directly (don't recalculate)
                 startPosition1Ms = project.startPosition1Ms
                 startPosition2Ms = project.startPosition2Ms
-                Log.d(TAG, "LaunchedEffect(projectId): Using startPos1=$startPosition1Ms, startPos2=$startPosition2Ms from DB")
+                AppLog.d(TAG, "LaunchedEffect(projectId): Using startPos1=$startPosition1Ms, startPos2=$startPosition2Ms from DB")
                 // remember loaded project for potential overwrite
                 loadedProject = project
                 // prefill save dialog name
@@ -413,9 +333,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 val video2Drawings = DrawingSerializer.deserializeShapesFromJson(drawingsData, "video2")
                 lineDrawingView1.setShapes(video1Drawings)
                 lineDrawingView2.setShapes(video2Drawings)
-                Log.d(TAG, "LaunchedEffect(projectId): Project load complete")
+                AppLog.d(TAG, "LaunchedEffect(projectId): Project load complete")
             } else {
-                Log.d(TAG, "LaunchedEffect(projectId): Project not found")
+                AppLog.d(TAG, "LaunchedEffect(projectId): Project not found")
             }
         }
     }
@@ -424,14 +344,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     DisposableEffect(currentBackStackEntry) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                Log.d(TAG, "ON_RESUME: videoUri1 = $videoUri1, videoUri2 = $videoUri2, startPos1=$startPosition1Ms, startPos2=$startPosition2Ms")
+                AppLog.d(TAG, "ON_RESUME: videoUri1 = $videoUri1, videoUri2 = $videoUri2, startPos1=$startPosition1Ms, startPos2=$startPosition2Ms")
                 
                 // Trigger LaunchedEffect to reload project data
                 onResumeTrigger++
                 
                 if (currentBackStackEntry?.savedStateHandle?.contains("newStart1Ms") == true &&
                     currentBackStackEntry.savedStateHandle.contains("newStart2Ms") == true) {
-                    Log.d(TAG, "ON_RESUME: Found new start positions in savedStateHandle")
+                    AppLog.d(TAG, "ON_RESUME: Found new start positions in savedStateHandle")
                     val newStart1 = currentBackStackEntry.savedStateHandle.get<Long>("newStart1Ms") ?: startPosition1Ms
                     val newStart2 = currentBackStackEntry.savedStateHandle.get<Long>("newStart2Ms") ?: startPosition2Ms
                     
@@ -444,12 +364,12 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                         alignmentPoint1Ms = newAlign1
                         alignmentPoint2Ms = newAlign2
                         offsetMs = newOffset
-                        Log.d(TAG, "ON_RESUME: Restored alignment points and offset: align1=$alignmentPoint1Ms, offset=$offsetMs, align2=$alignmentPoint2Ms")
+                        AppLog.d(TAG, "ON_RESUME: Restored alignment points and offset: align1=$alignmentPoint1Ms, offset=$offsetMs, align2=$alignmentPoint2Ms")
                     }
 
                     startPosition1Ms = min(newStart1, (originalDuration1Ms - 1L).coerceAtLeast(0L))
                     startPosition2Ms = min(newStart2, (originalDuration2Ms - 1L).coerceAtLeast(0L))
-                    Log.d(TAG, "ON_RESUME: Applied new startPos1=$startPosition1Ms, new startPos2=$startPosition2Ms")
+                    AppLog.d(TAG, "ON_RESUME: Applied new startPos1=$startPosition1Ms, new startPos2=$startPosition2Ms")
 
                     currentBackStackEntry.savedStateHandle.remove<Long>("newStart1Ms")
                     currentBackStackEntry.savedStateHandle.remove<Long>("newStart2Ms")
@@ -467,7 +387,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 // Restore temporary drawings if they exist
                 val tempDrawings = currentBackStackEntry?.savedStateHandle?.get<String>("tempDrawings")
                 if (tempDrawings != null) {
-                    Log.d(TAG, "ON_RESUME: Restoring temporary drawings")
+                    AppLog.d(TAG, "ON_RESUME: Restoring temporary drawings")
                     val video1Drawings = DrawingSerializer.deserializeShapesFromJson(tempDrawings, "video1")
                     val video2Drawings = DrawingSerializer.deserializeShapesFromJson(tempDrawings, "video2")
                     lineDrawingView1.setShapes(video1Drawings)
@@ -489,18 +409,18 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             val repository = ProjectRepository(db.projectDao())
             val latestProject = repository.getProjectById(projectId)
             if (latestProject != null) {
-                Log.d(TAG, "LaunchedEffect: Reloading project from DB: align1=${latestProject.alignmentPoint1Ms}, offset=${latestProject.offsetMs}, align2=${latestProject.alignmentPoint2Ms}")
+                AppLog.d(TAG, "LaunchedEffect: Reloading project from DB: align1=${latestProject.alignmentPoint1Ms}, offset=${latestProject.offsetMs}, align2=${latestProject.alignmentPoint2Ms}")
                 alignmentPoint1Ms = latestProject.alignmentPoint1Ms
                 alignmentPoint2Ms = latestProject.alignmentPoint2Ms
                 offsetMs = latestProject.offsetMs
                 // Use startPosition from DB directly (don't recalculate)
                 startPosition1Ms = latestProject.startPosition1Ms
                 startPosition2Ms = latestProject.startPosition2Ms
-                Log.d(TAG, "LaunchedEffect: Using startPos1=${latestProject.startPosition1Ms}, startPos2=${latestProject.startPosition2Ms} from DB")
+                AppLog.d(TAG, "LaunchedEffect: Using startPos1=${latestProject.startPosition1Ms}, startPos2=${latestProject.startPosition2Ms} from DB")
                 loadedProject = latestProject
             }
         } else if (hasNewStartPositions) {
-            Log.d(TAG, "LaunchedEffect: Skipping DB reload because new start positions were applied from start position setting screen")
+            AppLog.d(TAG, "LaunchedEffect: Skipping DB reload because new start positions were applied from start position setting screen")
             // Reset flag for next time
             hasNewStartPositions = false
         }
@@ -519,15 +439,15 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             0L
         }
         if (sharedMaxDurationMs != newMax) {
-            Log.d(TAG, "updateSharedMaxDuration: OldMax=$sharedMaxDurationMs, NewMax=$newMax. currentSharedPos=$sharedCurrentPositionMs")
-            Log.d(TAG, "updateSharedMaxDuration: exoPlayer1=$exoPlayer1, dur1=$originalDuration1Ms, start1=$startPosition1Ms, trim1=$trimmedDuration1")
-            Log.d(TAG, "updateSharedMaxDuration: exoPlayer2=$exoPlayer2, dur2=$originalDuration2Ms, start2=$startPosition2Ms, trim2=$trimmedDuration2")
+            AppLog.d(TAG, "updateSharedMaxDuration: OldMax=$sharedMaxDurationMs, NewMax=$newMax. currentSharedPos=$sharedCurrentPositionMs")
+            AppLog.d(TAG, "updateSharedMaxDuration: exoPlayer1=$exoPlayer1, dur1=$originalDuration1Ms, start1=$startPosition1Ms, trim1=$trimmedDuration1")
+            AppLog.d(TAG, "updateSharedMaxDuration: exoPlayer2=$exoPlayer2, dur2=$originalDuration2Ms, start2=$startPosition2Ms, trim2=$trimmedDuration2")
             sharedMaxDurationMs = newMax
             sharedCurrentPositionMs = sharedCurrentPositionMs.coerceIn(0L, newMax) // Ensure current position is within new max
         }
     }
     LaunchedEffect(startPosition1Ms, startPosition2Ms, originalDuration1Ms, originalDuration2Ms, exoPlayer1, exoPlayer2) {
-        Log.d(TAG, "LaunchedEffect to updateSharedMaxDuration triggered: startPos1=$startPosition1Ms, startPos2=$startPosition2Ms, dur1=$originalDuration1Ms, dur2=$originalDuration2Ms, player1=$exoPlayer1, player2=$exoPlayer2")
+        AppLog.d(TAG, "LaunchedEffect to updateSharedMaxDuration triggered: startPos1=$startPosition1Ms, startPos2=$startPosition2Ms, dur1=$originalDuration1Ms, dur2=$originalDuration2Ms, player1=$exoPlayer1, player2=$exoPlayer2")
         updateSharedMaxDuration()
         
         // Check if loading is complete
@@ -544,7 +464,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                               sharedMaxDurationMs > 0 // Duration is calculated
         
         if (isProjectLoaded && isPlaybackReady && isLoading) {
-            Log.d(TAG, "LaunchedEffect: Loading complete. Hiding loading screen.")
+            AppLog.d(TAG, "LaunchedEffect: Loading complete. Hiding loading screen.")
             isLoading = false
         }
     }
@@ -552,37 +472,37 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     val takeVideoLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                Log.d(TAG, "takeVideoLauncher1: URI obtained: $uri")
+                AppLog.d(TAG, "takeVideoLauncher1: URI obtained: $uri")
                 videoUri1 = uri; startPosition1Ms = 0L
-                try { if ("content" == uri.scheme) context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); Log.d(TAG, "Persisted URI for captured video 1: $uri") }
-                catch (e: SecurityException) { Log.e(TAG, "Failed to persist URI for captured video 1: $uri", e) }
+                try { if ("content" == uri.scheme) context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for captured video 1: $uri") }
+                catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for captured video 1: $uri", e) }
             }
         }
     }
     val selectVideoLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
-            Log.d(TAG, "selectVideoLauncher1: URI obtained: $it")
+            AppLog.d(TAG, "selectVideoLauncher1: URI obtained: $it")
             videoUri1 = it; startPosition1Ms = 0L
-            try { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION); Log.d(TAG, "Persisted URI for selected video 1: $it") }
-            catch (e: SecurityException) { Log.e(TAG, "Failed to persist URI for selected video 1: $it", e) }
+            try { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for selected video 1: $it") }
+            catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for selected video 1: $it", e) }
         }
     }
     val takeVideoLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                Log.d(TAG, "takeVideoLauncher2: URI obtained: $uri")
+                AppLog.d(TAG, "takeVideoLauncher2: URI obtained: $uri")
                 videoUri2 = uri; startPosition2Ms = 0L
-                try { if ("content" == uri.scheme) context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); Log.d(TAG, "Persisted URI for captured video 2: $uri") }
-                catch (e: SecurityException) { Log.e(TAG, "Failed to persist URI for captured video 2: $uri", e) }
+                try { if ("content" == uri.scheme) context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for captured video 2: $uri") }
+                catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for captured video 2: $uri", e) }
             }
         }
     }
     val selectVideoLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
-            Log.d(TAG, "selectVideoLauncher2: URI obtained: $it")
+            AppLog.d(TAG, "selectVideoLauncher2: URI obtained: $it")
             videoUri2 = it; startPosition2Ms = 0L
-            try { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION); Log.d(TAG, "Persisted URI for selected video 2: $it") }
-            catch (e: SecurityException) { Log.e(TAG, "Failed to persist URI for selected video 2: $it", e) }
+            try { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for selected video 2: $it") }
+            catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for selected video 2: $it", e) }
         }
     }
 
@@ -590,25 +510,25 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         if (isGranted) {
             val takeVideoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
             if (takeVideoIntent.resolveActivity(context.packageManager) != null) takeVideoLauncher1.launch(takeVideoIntent)
-            else Log.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video 1")
+            else AppLog.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video 1")
         }
-        else Log.w(TAG, "Camera permission denied for video 1")
+        else AppLog.w(TAG, "Camera permission denied for video 1")
     }
     val requestStoragePermissionLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) selectVideoLauncher1.launch("video/*")
-        else Log.w(TAG, "Storage permission denied for video 1")
+        else AppLog.w(TAG, "Storage permission denied for video 1")
     }
     val requestCameraPermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
             val takeVideoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
             if (takeVideoIntent.resolveActivity(context.packageManager) != null) takeVideoLauncher2.launch(takeVideoIntent)
-            else Log.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video 2")
+            else AppLog.e(TAG, "No activity for ACTION_VIDEO_CAPTURE video 2")
         }
-        else Log.w(TAG, "Camera permission denied for video 2")
+        else AppLog.w(TAG, "Camera permission denied for video 2")
     }
     val requestStoragePermissionLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) selectVideoLauncher2.launch("video/*")
-        else Log.w(TAG, "Storage permission denied for video 2")
+        else AppLog.w(TAG, "Storage permission denied for video 2")
     }
 
     fun initializeOrUpdatePlayer(player: ExoPlayer?, uri: Uri?, startPosMs: Long,
@@ -628,7 +548,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 override fun onVideoSizeChanged(videoSize: VideoSize) {
                     val aspectRatio = if (videoSize.height == 0) 16f / 9f else videoSize.width.toFloat() / videoSize.height
                     setAspectRatio(aspectRatio)
-                    Log.d(TAG, "Video size changed: ${videoSize.width}x${videoSize.height}, AspectRatio: $aspectRatio")
+                    AppLog.d(TAG, "Video size changed: ${videoSize.width}x${videoSize.height}, AspectRatio: $aspectRatio")
                 }
 
                 override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -638,14 +558,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                         val duration = window.durationMs
                         if (duration != C.TIME_UNSET && duration > 0) {
                             setOriginalDuration(duration)
-                            Log.d(TAG, "Timeline changed. Original duration: $duration ms for player of $uri")
+                            AppLog.d(TAG, "Timeline changed. Original duration: $duration ms for player of $uri")
                             updateSharedMaxDuration()
                         }
                     }
                 }
 
                 override fun onIsPlayingChanged(isPlayingChange: Boolean) {
-                    Log.d(TAG, "ExoPlayer (uri: $uri) onIsPlayingChanged: $isPlayingChange. Current composable isPlaying: $isPlaying")
+                    AppLog.d(TAG, "ExoPlayer (uri: $uri) onIsPlayingChanged: $isPlayingChange. Current composable isPlaying: $isPlaying")
                 }
             })
         }
@@ -655,7 +575,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         newPlayer.prepare()
         newPlayer.playWhenReady = false
         newPlayer.seekTo(startPosMs)
-        Log.d(TAG, "Player initialized/updated for URI: $uri, seeking to $startPosMs ms. playWhenReady initially false.")
+        AppLog.d(TAG, "Player initialized/updated for URI: $uri, seeking to $startPosMs ms. playWhenReady initially false.")
     }
 
     // レイアウトモード変更時に編集モードを終了
@@ -669,27 +589,17 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     // 描画モード変更時にLineDrawingViewの状態を更新
     LaunchedEffect(isDrawingMode1, drawMode1) {
         if (isDrawingMode1) {
-            // 描画モード進入時にズームをリセット
-            android.util.Log.d("VideoScreen", "Drawing mode ON for video1, mode=$drawMode1")
-            videoScale1 = 1f
-            videoOffsetX1 = 0f
-            videoOffsetY1 = 0f
-            lineDrawingView1.setZoomInfo(1f, 0f, 0f)
+            AppLog.d("VideoScreen", "Drawing mode ON for video1, mode=$drawMode1")
             lineDrawingView1.setDrawingEnabled(true)
             lineDrawingView1.setDrawMode(drawMode1)
         } else {
-            android.util.Log.d("VideoScreen", "Drawing mode OFF for video1")
+            AppLog.d("VideoScreen", "Drawing mode OFF for video1")
             lineDrawingView1.setDrawingEnabled(false)
         }
     }
     
     LaunchedEffect(isDrawingMode2, drawMode2) {
         if (isDrawingMode2) {
-            // 描画モード進入時にズームをリセット
-            videoScale2 = 1f
-            videoOffsetX2 = 0f
-            videoOffsetY2 = 0f
-            lineDrawingView2.setZoomInfo(1f, 0f, 0f)
             lineDrawingView2.setDrawingEnabled(true)
             lineDrawingView2.setDrawMode(drawMode2)
         } else {
@@ -702,34 +612,34 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
 
     DisposableEffect(videoUri1, exoPlayer1) {
         if (videoUri1 != null && exoPlayer1 == null) {
-            Log.d(TAG, "DisposableEffect(videoUri1): Initializing player1 with startPosition=$startPosition1Ms")
+            AppLog.d(TAG, "DisposableEffect(videoUri1): Initializing player1 with startPosition=$startPosition1Ms")
             initializeOrUpdatePlayer(null, videoUri1, startPosition1Ms, { exoPlayer1 = it }, { videoAspectRatio1 = it }, { originalDuration1Ms = it })
         }
         onDispose {
             if (videoUri1 == null) {
                 exoPlayer1?.release()
                 exoPlayer1 = null
-                Log.d(TAG, "Disposed and released exoPlayer1 because videoUri1 became null.")
+                AppLog.d(TAG, "Disposed and released exoPlayer1 because videoUri1 became null.")
             }
         }
     }
     DisposableEffect(videoUri2, exoPlayer2) {
         if (videoUri2 != null && exoPlayer2 == null) {
-            Log.d(TAG, "DisposableEffect(videoUri2): Initializing player2 with startPosition=$startPosition2Ms")
+            AppLog.d(TAG, "DisposableEffect(videoUri2): Initializing player2 with startPosition=$startPosition2Ms")
             initializeOrUpdatePlayer(null, videoUri2, startPosition2Ms, { exoPlayer2 = it }, { videoAspectRatio2 = it }, { originalDuration2Ms = it })
         }
         onDispose {
             if (videoUri2 == null) {
                 exoPlayer2?.release()
                 exoPlayer2 = null
-                Log.d(TAG, "Disposed and released exoPlayer2 because videoUri2 became null.")
+                AppLog.d(TAG, "Disposed and released exoPlayer2 because videoUri2 became null.")
             }
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            Log.d(TAG, "VideoScreen onDispose: Releasing players.")
+            AppLog.d(TAG, "VideoScreen onDispose: Releasing players.")
             exoPlayer1?.release()
             exoPlayer1 = null
             exoPlayer2?.release()
@@ -747,7 +657,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             var lastUpdateTime = System.currentTimeMillis()
             exoPlayer1?.play()
             exoPlayer2?.play()
-            Log.d(TAG, "LaunchedEffect: isPlaying is true. Advancing position. Player1.play() and Player2.play() called.")
+            AppLog.d(TAG, "LaunchedEffect: isPlaying is true. Advancing position. Player1.play() and Player2.play() called.")
 
             while (isPlaying && sharedCurrentPositionMs < sharedMaxDurationMs) {
                 delay(50)
@@ -779,14 +689,14 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             }
             if (sharedCurrentPositionMs >= sharedMaxDurationMs && isPlaying) {
                 isPlaying = false
-                Log.d(TAG, "LaunchedEffect: Playback reached end. Setting isPlaying to false.")
+                AppLog.d(TAG, "LaunchedEffect: Playback reached end. Setting isPlaying to false.")
             } else if (!isPlaying) {
-                Log.d(TAG, "LaunchedEffect: isPlaying became false during loop. Pausing players.")
+                AppLog.d(TAG, "LaunchedEffect: isPlaying became false during loop. Pausing players.")
                 exoPlayer1?.pause()
                 exoPlayer2?.pause()
             }
         } else {
-            Log.d(TAG, "LaunchedEffect: isPlaying is false. Pausing players.")
+            AppLog.d(TAG, "LaunchedEffect: isPlaying is false. Pausing players.")
             exoPlayer1?.pause()
             exoPlayer2?.pause()
         }
@@ -798,17 +708,17 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             isPlaying = newIsPlayingState
 
             if (newIsPlayingState) {
-                Log.d(TAG, "togglePlayPause: Set isPlaying to TRUE. Telling players to play.")
+                AppLog.d(TAG, "togglePlayPause: Set isPlaying to TRUE. Telling players to play.")
                 if (sharedCurrentPositionMs >= sharedMaxDurationMs && sharedMaxDurationMs > 0) {
                     sharedCurrentPositionMs = 0L
                     exoPlayer1?.seekTo(startPosition1Ms)
                     exoPlayer2?.seekTo(startPosition2Ms)
-                    Log.d(TAG, "Playback reset to start as it was at the end.")
+                    AppLog.d(TAG, "Playback reset to start as it was at the end.")
                 }
                 exoPlayer1?.play()
                 exoPlayer2?.play()
             } else {
-                Log.d(TAG, "togglePlayPause: Set isPlaying to FALSE. Telling players to pause.")
+                AppLog.d(TAG, "togglePlayPause: Set isPlaying to FALSE. Telling players to pause.")
                 exoPlayer1?.pause()
                 exoPlayer2?.pause()
             }
@@ -829,7 +739,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             
             exoPlayer1?.seekTo(targetPos1)
             exoPlayer2?.seekTo(targetPos2)
-            Log.d(TAG, "Frame advance: moved to $newPosition ms")
+            AppLog.d(TAG, "Frame advance: moved to $newPosition ms")
         }
     }
 
@@ -845,7 +755,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
             val targetPos2 = (startPosition2Ms + sharedCurrentPositionMs).coerceIn(0, originalDuration2Ms.coerceAtLeast(0L))
             exoPlayer2?.seekTo(targetPos2)
 
-            Log.d(TAG, "Seeked to: $sharedCurrentPositionMs ms (Player1: $targetPos1, Player2: $targetPos2)")
+            AppLog.d(TAG, "Seeked to: $sharedCurrentPositionMs ms (Player1: $targetPos1, Player2: $targetPos2)")
 
             coroutineScope.launch { // Use coroutineScope to launch delay
                 delay(100)
@@ -929,11 +839,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
-                                scale = videoScale1,
-                                offsetX = videoOffsetX1,
-                                offsetY = videoOffsetY1,
-                                onScaleChange = { videoScale1 = it },
-                                onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
                             )
                             if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier.width(4.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
@@ -950,11 +855,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
-                                scale = videoScale2,
-                                offsetX = videoOffsetX2,
-                                offsetY = videoOffsetY2,
-                                onScaleChange = { videoScale2 = it },
-                                onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
                             )
                         }
@@ -984,11 +884,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView1.clearCanvas() },
                                     lineDrawingView = lineDrawingView1,
-                                    scale = videoScale1,
-                                    offsetX = videoOffsetX1,
-                                    offsetY = videoOffsetY1,
-                                    onScaleChange = { videoScale1 = it },
-                                    onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -1007,11 +902,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView2.clearCanvas() },
                                     lineDrawingView = lineDrawingView2,
-                                    scale = videoScale2,
-                                    offsetX = videoOffsetX2,
-                                    offsetY = videoOffsetY2,
-                                    onScaleChange = { videoScale2 = it },
-                                    onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -1036,11 +926,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
-                                scale = videoScale1,
-                                offsetX = videoOffsetX1,
-                                offsetY = videoOffsetY1,
-                                onScaleChange = { videoScale1 = it },
-                                onOffsetChange = { x, y -> videoOffsetX1 = x; videoOffsetY1 = y },
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                             VideoPlayerBox(
@@ -1056,11 +941,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
-                                scale = videoScale2,
-                                offsetX = videoOffsetX2,
-                                offsetY = videoOffsetY2,
-                                onScaleChange = { videoScale2 = it },
-                                onOffsetChange = { x, y -> videoOffsetX2 = x; videoOffsetY2 = y },
                                 modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                         }
@@ -1195,7 +1075,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     createdAt = loadedProject!!.createdAt,
                                     updatedAt = System.currentTimeMillis()
                                 )
-                                android.util.Log.d("VideoScreen", "Saving project: name=${updated.name}, align1=${updated.alignmentPoint1Ms}, offset=${updated.offsetMs}, align2=${updated.alignmentPoint2Ms}")
+                                AppLog.d("VideoScreen", "Saving project: name=${updated.name}, align1=${updated.alignmentPoint1Ms}, offset=${updated.offsetMs}, align2=${updated.alignmentPoint2Ms}")
                                 repository.updateProject(updated)
                                 // Update loadedProject with the saved data
                                 loadedProject = updated
@@ -1268,7 +1148,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                         offsetMs = offsetMs,
                                         drawingsJson = combinedDrawings
                                     )
-                                    android.util.Log.d("VideoScreen", "Creating new project: name=${project.name}, align1=${project.alignmentPoint1Ms}, offset=${project.offsetMs}, align2=${project.alignmentPoint2Ms}")
+                                    AppLog.d("VideoScreen", "Creating new project: name=${project.name}, align1=${project.alignmentPoint1Ms}, offset=${project.offsetMs}, align2=${project.alignmentPoint2Ms}")
                                     repository.insertProject(project)
                                     
                                     // Reset dialog

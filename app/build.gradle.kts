@@ -24,12 +24,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "ENABLE_LOGGING", "true")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("boolean", "ENABLE_LOGGING", "false")
         }
     }
     compileOptions {
@@ -41,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true  // BuildConfigを有効化
     }
     composeOptions {
         // kotlinCompilerExtensionVersion = "1.5.1" // <- 削除
