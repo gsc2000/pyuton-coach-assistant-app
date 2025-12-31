@@ -196,7 +196,10 @@ fun StartPositionSettingScreen(
                 VideoPreviewAndSlider(
                     exoPlayer = exoPlayer1Preview,
                     alignmentPointMs = alignmentPoint1Ms,
-                    onAlignmentPointChange = { alignmentPoint1Ms = it },
+                    onAlignmentPointChange = { newValue ->
+                        alignmentPoint1Ms = newValue
+                        exoPlayer1Preview?.seekTo(newValue)
+                    },
                     durationMs = duration1Ms
                 )
             } else if (video1UriString != null) {

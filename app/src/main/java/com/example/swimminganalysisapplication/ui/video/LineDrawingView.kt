@@ -12,9 +12,10 @@ import android.view.View
 import kotlin.math.sqrt
 
 enum class DrawMode {
-    FREE,
-    LINE,
-    CIRCLE
+    SELECT,    // 既存図形の選択・編集モード
+    FREE,      // 自由描画モード
+    LINE,      // 直線描画モード
+    CIRCLE     // 円描画モード
 }
 
 class LineDrawingView @JvmOverloads constructor(
@@ -191,45 +192,51 @@ class LineDrawingView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 val n = toNormalized(x, y)
                 android.util.Log.d("LineDrawingView", "ACTION_DOWN normalized: x=${n.x}, y=${n.y}, contentWidth=$contentWidthF, contentHeight=$contentHeightF")
-                // If touching near an existing shape, select it
-                val hitIdx = findShapeAt(n, 0.05f)
-                if (hitIdx != null) {
-                    selectedIndex = hitIdx
-                    lastNormalized = n
-                    val shape = shapes[hitIdx]
-                    // Determine edit mode based on touch position within the shape
-                    editMode = when (shape) {
-                        is Shape.Line -> {
-                            if (isNearLineEndpoint(n, shape, 0.05f)) {
-                                // Determine which endpoint is closer
-                                draggedLineEndpoint = getCloserLineEndpoint(n, shape)
-                                "line_angle"
-                            } else {
-                                draggedLineEndpoint = null
-                                "move"
+                // If touching near an existing shape, select it (only in SELECT mode)
+                if (currentDrawMode == DrawMode.SELECT) {
+                    val hitIdx = findShapeAt(n, 0.05f)
+                    if (hitIdx != null) {
+                        selectedIndex = hitIdx
+                        lastNormalized = n
+                        val shape = shapes[hitIdx]
+                        // Determine edit mode based on touch position within the shape
+                        editMode = when (shape) {
+                            is Shape.Line -> {
+                                if (isNearLineEndpoint(n, shape, 0.05f)) {
+                                    // Determine which endpoint is closer
+                                    draggedLineEndpoint = getCloserLineEndpoint(n, shape)
+                                    "line_angle"
+                                } else {
+                                    draggedLineEndpoint = null
+                                    "move"
+                                }
                             }
+                            is Shape.Circle -> {
+                                if (isNearCircleEdge(n, shape, 0.05f)) "circle_resize" else "move"
+                            }
+                            else -> "move"  // Free: always move
                         }
-                        is Shape.Circle -> {
-                            if (isNearCircleEdge(n, shape, 0.05f)) "circle_resize" else "move"
-                        }
-                        else -> "move"  // Free: always move
+                        isMoving = true
+                        // Prevent parent scroll when shape is selected
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        return true
+                    } else {
+                        // Deselect if touching empty area in SELECT mode
+                        selectedIndex = null
+                        return true
                     }
-                    isMoving = true
-                    // Prevent parent scroll when shape is selected
+                } else {
+                    // Not in SELECT mode -> start creating a new shape
+                    selectedIndex = null
+                    editMode = null
+                    draggedLineEndpoint = null
+                    val pts = toMutableListIfFree(currentDrawMode, n)
+                    currentShape = pts
+                    android.util.Log.d("LineDrawingView", "Created new shape: mode=$currentDrawMode, startPoint=(${n.x}, ${n.y})")
+                    // Prevent parent scroll when drawing a new shape
                     parent?.requestDisallowInterceptTouchEvent(true)
                     return true
                 }
-
-                // Not hitting existing shape -> start creating a new one
-                selectedIndex = null
-                editMode = null
-                draggedLineEndpoint = null
-                val pts = toMutableListIfFree(currentDrawMode, n)
-                currentShape = pts
-                android.util.Log.d("LineDrawingView", "Created new shape: mode=$currentDrawMode, startPoint=(${n.x}, ${n.y})")
-                // Prevent parent scroll when drawing a new shape
-                parent?.requestDisallowInterceptTouchEvent(true)
-                return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val n = toNormalized(x, y)
@@ -475,6 +482,7 @@ class LineDrawingView @JvmOverloads constructor(
 
     private fun toMutableListIfFree(mode: DrawMode, n: PointF): Shape {
         return when (mode) {
+            DrawMode.SELECT -> Shape.Free(mutableListOf())  // SELECTモード時は空の図形
             DrawMode.FREE -> Shape.Free(mutableListOf(n))
             DrawMode.LINE -> Shape.Line(PointF(n.x, n.y), PointF(n.x, n.y))
             DrawMode.CIRCLE -> Shape.Circle(PointF(n.x, n.y), PointF(n.x, n.y))

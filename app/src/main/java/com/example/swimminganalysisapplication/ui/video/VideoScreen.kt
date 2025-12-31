@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -1190,24 +1191,28 @@ fun DrawingControls(
                 .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { onIsDrawingModeChange(!isDrawingMode) }) {
+            IconButton(onClick = { onIsDrawingModeChange(!isDrawingMode) }, modifier = Modifier.size(40.dp)) {
                 Icon(
                     if (isDrawingMode) Icons.Filled.Close else Icons.Filled.BorderColor,
-                    contentDescription = "Toggle Drawing"
+                    contentDescription = "Toggle Drawing",
+                    modifier = Modifier.size(20.dp)
                 )
             }
             if (isDrawingMode) {
-                IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
-                    Icon(Icons.Filled.Brush, contentDescription = "Freehand")
+                IconToggleButton(checked = currentMode == DrawMode.SELECT, onCheckedChange = { onDrawModeChange(DrawMode.SELECT) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.TouchApp, contentDescription = "Select", modifier = Modifier.size(20.dp))
                 }
-                IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
-                    Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line")
+                IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.Brush, contentDescription = "Freehand", modifier = Modifier.size(20.dp))
                 }
-                IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
-                    Icon(Icons.Filled.Circle, contentDescription = "Circle")
+                IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line", modifier = Modifier.size(20.dp))
                 }
-                IconButton(onClick = onDeleteSelected) {
-                    Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected")
+                IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.Circle, contentDescription = "Circle", modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onDeleteSelected, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected", modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -1216,24 +1221,28 @@ fun DrawingControls(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
         ) {
-            IconButton(onClick = { onIsDrawingModeChange(!isDrawingMode) }) {
+            IconButton(onClick = { onIsDrawingModeChange(!isDrawingMode) }, modifier = Modifier.size(40.dp)) {
                 Icon(
                     if (isDrawingMode) Icons.Filled.Close else Icons.Filled.BorderColor,
-                    contentDescription = "Toggle Drawing"
+                    contentDescription = "Toggle Drawing",
+                    modifier = Modifier.size(20.dp)
                 )
             }
             if (isDrawingMode) {
-                IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }) {
-                    Icon(Icons.Filled.Brush, contentDescription = "Freehand")
+                IconToggleButton(checked = currentMode == DrawMode.SELECT, onCheckedChange = { onDrawModeChange(DrawMode.SELECT) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.TouchApp, contentDescription = "Select", modifier = Modifier.size(20.dp))
                 }
-                IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }) {
-                    Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line")
+                IconToggleButton(checked = currentMode == DrawMode.FREE, onCheckedChange = { onDrawModeChange(DrawMode.FREE) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.Brush, contentDescription = "Freehand", modifier = Modifier.size(20.dp))
                 }
-                IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }) {
-                    Icon(Icons.Filled.Circle, contentDescription = "Circle")
+                IconToggleButton(checked = currentMode == DrawMode.LINE, onCheckedChange = { onDrawModeChange(DrawMode.LINE) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Line", modifier = Modifier.size(20.dp))
                 }
-                IconButton(onClick = onDeleteSelected) {
-                    Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected")
+                IconToggleButton(checked = currentMode == DrawMode.CIRCLE, onCheckedChange = { onDrawModeChange(DrawMode.CIRCLE) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.Circle, contentDescription = "Circle", modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onDeleteSelected, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.DeleteForever, contentDescription = "Delete Selected", modifier = Modifier.size(20.dp))
                 }
             }
         }
