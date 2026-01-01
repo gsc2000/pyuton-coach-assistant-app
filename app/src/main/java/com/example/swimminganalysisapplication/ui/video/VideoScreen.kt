@@ -133,10 +133,30 @@ private fun VideoPlayerBox(
     layoutMode: VideoLayoutMode,
     onClearLines: () -> Unit,
     lineDrawingView: LineDrawingView,
+    scalePercent: Float = 100f,
+    onScalePercentChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
 
     Column(modifier = modifier) {
+        // Size control slider - hide for overlay mode (will be shown outside)
+        if (layoutMode != VideoLayoutMode.OVERLAY) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Text("${scalePercent.toInt()}%", modifier = Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall)
+                Slider(
+                    value = scalePercent,
+                    onValueChange = onScalePercentChange,
+                    modifier = Modifier.weight(1f),
+                    valueRange = 30f..150f
+                )
+            }
+        }
+        
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight()) {
         Box(
             modifier = Modifier
                 .clickable(onClick = onClick, enabled = !isDrawingMode)
@@ -145,6 +165,8 @@ private fun VideoPlayerBox(
                     color = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 )
                 .clip(RectangleShape)
+                .fillMaxSize()
+                .graphicsLayer(scaleX = scalePercent / 100f, scaleY = scalePercent / 100f)
         ) {
             Box(
                 modifier = Modifier
@@ -196,18 +218,26 @@ private fun VideoPlayerBox(
                 }
             }
         }
-        // Place controls outside the video box so they don't overlap the video content
+        // Place controls on top of the video box
         if (exoPlayer != null) {
-            Spacer(modifier = Modifier.height(6.dp))
-            DrawingControls(
-                layoutMode = layoutMode,
-                isDrawingMode = isDrawingMode,
-                onIsDrawingModeChange = onIsDrawingModeChange,
-                currentMode = drawMode,
-                onDrawModeChange = onDrawModeChange,
-                onClear = { lineDrawingView.clearCanvas() }, // Call clear on the specific instance
-                onDeleteSelected = { lineDrawingView.deleteSelectedShape() }
-            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .zIndex(10f)
+                    .graphicsLayer(alpha = 0.85f)
+            ) {
+                DrawingControls(
+                    layoutMode = layoutMode,
+                    isDrawingMode = isDrawingMode,
+                    onIsDrawingModeChange = onIsDrawingModeChange,
+                    currentMode = drawMode,
+                    onDrawModeChange = onDrawModeChange,
+                    onClear = { lineDrawingView.clearCanvas() },
+                    onDeleteSelected = { lineDrawingView.deleteSelectedShape() }
+                )
+            }
+        }
         }
     }
 }
@@ -279,6 +309,8 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
     var overlayAlpha1 by rememberSaveable { mutableStateOf(1.0f) }
     var overlayAlpha2 by rememberSaveable { mutableStateOf(0.5f) }
+    var videoScalePercent1 by rememberSaveable { mutableStateOf(100f) }
+    var videoScalePercent2 by rememberSaveable { mutableStateOf(100f) }
 
     var sharedCurrentPositionMs by rememberSaveable { mutableStateOf(0L) }
     var sharedMaxDurationMs by rememberSaveable { mutableStateOf(0L) }
@@ -820,12 +852,46 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
             ) {
-            Box(modifier = Modifier.weight(1f)) {
+            // Overlay mode size control sliders - shown at top
+            if (layoutMode == VideoLayoutMode.OVERLAY) {
+                Row(modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    // Video 1 slider
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Text("${videoScalePercent1.toInt()}%", modifier = Modifier.width(35.dp), style = MaterialTheme.typography.labelSmall)
+                        Slider(
+                            value = videoScalePercent1,
+                            onValueChange = { videoScalePercent1 = it },
+                            modifier = Modifier.weight(1f),
+                            valueRange = 30f..150f
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    // Video 2 slider
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Text("${videoScalePercent2.toInt()}%", modifier = Modifier.width(35.dp), style = MaterialTheme.typography.labelSmall)
+                        Slider(
+                            value = videoScalePercent2,
+                            onValueChange = { videoScalePercent2 = it },
+                            modifier = Modifier.weight(1f),
+                            valueRange = 30f..150f
+                        )
+                    }
+                }
+            }
+            
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()) {
                 when (layoutMode) {
                     VideoLayoutMode.HORIZONTAL -> {
                         Row(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentHeight(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             VideoPlayerBox(
@@ -841,6 +907,8 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
+                                scalePercent = videoScalePercent1,
+                                onScalePercentChange = { videoScalePercent1 = it },
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer2 != null) PaddingValues(end = 2.dp) else PaddingValues())
                             )
                             if (exoPlayer1 != null && exoPlayer2 != null) Spacer(modifier = Modifier.width(4.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
@@ -857,22 +925,22 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
+                                scalePercent = videoScalePercent2,
+                                onScalePercentChange = { videoScalePercent2 = it },
                                 modifier = Modifier.weight(1f).padding(if (exoPlayer1 != null) PaddingValues(start = 2.dp) else PaddingValues())
                             )
                         }
                     }
                     VideoLayoutMode.VERTICAL -> {
-                        val verticalScrollState = rememberScrollState()
                         val isShapeSelected = lineDrawingView1.isShapeSelected() || lineDrawingView2.isShapeSelected()
                         
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .verticalScroll(verticalScrollState, enabled = !isShapeSelected)
                                 .padding(horizontal = 8.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                            Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
                                 VideoPlayerBox(
                                     exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
                                     currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
@@ -886,11 +954,13 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView1.clearCanvas() },
                                     lineDrawingView = lineDrawingView1,
+                                    scalePercent = videoScalePercent1,
+                                    onScalePercentChange = { videoScalePercent1 = it },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
                             if (exoPlayer1 != null || exoPlayer2 != null) Spacer(Modifier.height(8.dp))
-                            Box(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                            Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
                                 VideoPlayerBox(
                                     exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
                                     currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
@@ -904,50 +974,62 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                     layoutMode = layoutMode,
                                     onClearLines = { lineDrawingView2.clearCanvas() },
                                     lineDrawingView = lineDrawingView2,
+                                    scalePercent = videoScalePercent2,
+                                    onScalePercentChange = { videoScalePercent2 = it },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
                     }
                     VideoLayoutMode.OVERLAY -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            VideoPlayerBox(
-                                exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
-                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
-                                durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
-                                onClick = { /* Overlay mode, click disabled */ },
-                                isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { newMode ->
-                                    isDrawingMode1 = newMode
-                                    if (!newMode) lineDrawingView1.clearSelection()
-                                },
-                                drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
-                                layoutMode = layoutMode,
-                                onClearLines = { lineDrawingView1.clearCanvas() },
-                                lineDrawingView = lineDrawingView1,
-                                modifier = Modifier.fillMaxSize().zIndex(1f).graphicsLayer(alpha = overlayAlpha1, compositingStrategy = CompositingStrategy.Offscreen)
-                            )
-                            VideoPlayerBox(
-                                exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
-                                currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
-                                durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
-                                onClick = { /* Overlay mode, click disabled */ },
-                                isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { newMode ->
-                                    isDrawingMode2 = newMode
-                                    if (!newMode) lineDrawingView2.clearSelection()
-                                },
-                                drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
-                                layoutMode = layoutMode,
-                                onClearLines = { lineDrawingView2.clearCanvas() },
-                                lineDrawingView = lineDrawingView2,
-                                modifier = Modifier.fillMaxSize().zIndex(2f).graphicsLayer(alpha = overlayAlpha2, compositingStrategy = CompositingStrategy.Offscreen)
-                            )
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Box(modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentHeight()) {
+                                VideoPlayerBox(
+                                    exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
+                                    currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L)),
+                                    durationOfTrimmedView = (originalDuration1Ms - startPosition1Ms).coerceAtLeast(0L),
+                                    onClick = { /* Overlay mode, click disabled */ },
+                                    isDrawingMode = isDrawingMode1, onIsDrawingModeChange = { newMode ->
+                                        isDrawingMode1 = newMode
+                                        if (!newMode) lineDrawingView1.clearSelection()
+                                    },
+                                    drawMode = drawMode1, onDrawModeChange = { drawMode1 = it },
+                                    layoutMode = layoutMode,
+                                    onClearLines = { lineDrawingView1.clearCanvas() },
+                                    lineDrawingView = lineDrawingView1,
+                                    scalePercent = videoScalePercent1,
+                                    onScalePercentChange = { videoScalePercent1 = it },
+                                    modifier = Modifier.fillMaxSize().zIndex(1f).graphicsLayer(alpha = overlayAlpha1, compositingStrategy = CompositingStrategy.Offscreen)
+                                )
+                                VideoPlayerBox(
+                                    exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
+                                    currentPositionInTrimmedView = (sharedCurrentPositionMs).coerceIn(0, (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L)),
+                                    durationOfTrimmedView = (originalDuration2Ms - startPosition2Ms).coerceAtLeast(0L),
+                                    onClick = { /* Overlay mode, click disabled */ },
+                                    isDrawingMode = isDrawingMode2, onIsDrawingModeChange = { newMode ->
+                                        isDrawingMode2 = newMode
+                                        if (!newMode) lineDrawingView2.clearSelection()
+                                    },
+                                    drawMode = drawMode2, onDrawModeChange = { drawMode2 = it },
+                                    layoutMode = layoutMode,
+                                    onClearLines = { lineDrawingView2.clearCanvas() },
+                                    lineDrawingView = lineDrawingView2,
+                                    scalePercent = videoScalePercent2,
+                                    onScalePercentChange = { videoScalePercent2 = it },
+                                    modifier = Modifier.fillMaxSize().zIndex(2f).graphicsLayer(alpha = overlayAlpha2, compositingStrategy = CompositingStrategy.Offscreen)
+                                )
+                            }
                         }
                     }
                 }
             }
 
             // Controls section
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)) {
                 if (sharedMaxDurationMs > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         Text(formatTime(sharedCurrentPositionMs), style = MaterialTheme.typography.bodySmall)
