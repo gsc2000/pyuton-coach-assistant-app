@@ -346,8 +346,8 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 AppLog.d(TAG, "LaunchedEffect(projectId): Loaded project: name=${project.name}")
                 AppLog.d(TAG, "LaunchedEffect(projectId): align1=${project.alignmentPoint1Ms}ms, offset=${project.offsetMs}ms, align2=${project.alignmentPoint2Ms}ms")
                 AppLog.d(TAG, "LaunchedEffect(projectId): startPos1=${project.startPosition1Ms}ms, startPos2=${project.startPosition2Ms}ms (from DB)")
-                videoUri1 = Uri.parse(project.videoUri1)
-                videoUri2 = Uri.parse(project.videoUri2)
+                videoUri1 = if (!project.videoUri1.isNullOrEmpty()) Uri.parse(project.videoUri1) else null
+                videoUri2 = if (!project.videoUri2.isNullOrEmpty()) Uri.parse(project.videoUri2) else null
                 // Restore alignment points and common offset
                 alignmentPoint1Ms = project.alignmentPoint1Ms
                 alignmentPoint2Ms = project.alignmentPoint2Ms
@@ -507,6 +507,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
                 AppLog.d(TAG, "takeVideoLauncher1: URI obtained: $uri")
+                // Release existing player before setting new URI
+                exoPlayer1?.release()
+                exoPlayer1 = null
                 videoUri1 = uri; startPosition1Ms = 0L
                 try { if ("content" == uri.scheme) context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for captured video 1: $uri") }
                 catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for captured video 1: $uri", e) }
@@ -516,6 +519,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     val selectVideoLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             AppLog.d(TAG, "selectVideoLauncher1: URI obtained: $it")
+            // Release existing player before setting new URI
+            exoPlayer1?.release()
+            exoPlayer1 = null
             videoUri1 = it; startPosition1Ms = 0L
             try { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for selected video 1: $it") }
             catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for selected video 1: $it", e) }
@@ -525,6 +531,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
                 AppLog.d(TAG, "takeVideoLauncher2: URI obtained: $uri")
+                // Release existing player before setting new URI
+                exoPlayer2?.release()
+                exoPlayer2 = null
                 videoUri2 = uri; startPosition2Ms = 0L
                 try { if ("content" == uri.scheme) context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for captured video 2: $uri") }
                 catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for captured video 2: $uri", e) }
@@ -534,6 +543,9 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
     val selectVideoLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             AppLog.d(TAG, "selectVideoLauncher2: URI obtained: $it")
+            // Release existing player before setting new URI
+            exoPlayer2?.release()
+            exoPlayer2 = null
             videoUri2 = it; startPosition2Ms = 0L
             try { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION); AppLog.d(TAG, "Persisted URI for selected video 2: $it") }
             catch (e: SecurityException) { AppLog.e(TAG, "Failed to persist URI for selected video 2: $it", e) }
