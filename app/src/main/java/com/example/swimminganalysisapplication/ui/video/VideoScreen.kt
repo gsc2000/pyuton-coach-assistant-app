@@ -277,7 +277,8 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
 
     var isPlaying by rememberSaveable { mutableStateOf(false) }
     var layoutMode by rememberSaveable { mutableStateOf(VideoLayoutMode.HORIZONTAL) }
-    var overlayAlpha by rememberSaveable { mutableStateOf(0.5f) }
+    var overlayAlpha1 by rememberSaveable { mutableStateOf(1.0f) }
+    var overlayAlpha2 by rememberSaveable { mutableStateOf(0.5f) }
 
     var sharedCurrentPositionMs by rememberSaveable { mutableStateOf(0L) }
     var sharedMaxDurationMs by rememberSaveable { mutableStateOf(0L) }
@@ -909,10 +910,6 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                         }
                     }
                     VideoLayoutMode.OVERLAY -> {
-                        val (alpha1, alpha2) = Pair(1f - overlayAlpha, overlayAlpha)
-                        val zIndex1 = if (overlayAlpha > 0.5f) 1f else 2f
-                        val zIndex2 = if (overlayAlpha > 0.5f) 2f else 1f
-
                         Box(modifier = Modifier.fillMaxSize()) {
                             VideoPlayerBox(
                                 exoPlayer = exoPlayer1, videoAspectRatio = videoAspectRatio1, videoName = "ビデオ1",
@@ -927,7 +924,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView1.clearCanvas() },
                                 lineDrawingView = lineDrawingView1,
-                                modifier = Modifier.fillMaxSize().zIndex(zIndex1).graphicsLayer(alpha = alpha1, compositingStrategy = CompositingStrategy.Offscreen)
+                                modifier = Modifier.fillMaxSize().zIndex(1f).graphicsLayer(alpha = overlayAlpha1, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                             VideoPlayerBox(
                                 exoPlayer = exoPlayer2, videoAspectRatio = videoAspectRatio2, videoName = "ビデオ2",
@@ -942,7 +939,7 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                                 layoutMode = layoutMode,
                                 onClearLines = { lineDrawingView2.clearCanvas() },
                                 lineDrawingView = lineDrawingView2,
-                                modifier = Modifier.fillMaxSize().zIndex(zIndex2).graphicsLayer(alpha = alpha2, compositingStrategy = CompositingStrategy.Offscreen)
+                                modifier = Modifier.fillMaxSize().zIndex(2f).graphicsLayer(alpha = overlayAlpha2, compositingStrategy = CompositingStrategy.Offscreen)
                             )
                         }
                     }
@@ -964,14 +961,27 @@ fun VideoScreen(navController: NavController, projectId: Int? = null) {
                 }
 
                 if (layoutMode == VideoLayoutMode.OVERLAY) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Video1")
-                        Slider(
-                            value = overlayAlpha,
-                            onValueChange = { overlayAlpha = it },
-                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                        )
-                        Text("Video2")
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Video1", modifier = Modifier.width(50.dp))
+                            Slider(
+                                value = overlayAlpha1,
+                                onValueChange = { overlayAlpha1 = it },
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                valueRange = 0f..1f
+                            )
+                            Text(String.format("%.0f%%", overlayAlpha1 * 100), modifier = Modifier.width(40.dp))
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Video2", modifier = Modifier.width(50.dp))
+                            Slider(
+                                value = overlayAlpha2,
+                                onValueChange = { overlayAlpha2 = it },
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                valueRange = 0f..1f
+                            )
+                            Text(String.format("%.0f%%", overlayAlpha2 * 100), modifier = Modifier.width(40.dp))
+                        }
                     }
                 }
 
